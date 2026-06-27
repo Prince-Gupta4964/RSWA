@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "813321513896",
+    "project_id": "rswaapps",
+    "storage_bucket": "rswaapps.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:813321513896:android:bf4fa015da8759d5b84b9d",
+        "android_client_info": {
+          "package_name": "com.example.rswa"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbbeJ9695vius5OZCSHjQID9wFL7t3g6E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
