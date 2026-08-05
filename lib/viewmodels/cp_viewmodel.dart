@@ -37,7 +37,11 @@ class CPViewModel extends ChangeNotifier {
     required String advisorReachedBy,
     required String callerRef,
     required String status,
-    required String reraId, // <-- NAYA: RERA ID add kiya
+    required String reraId,
+    String? email,
+    String? password,
+    String? parentUid,
+    String? addedBy,
   }) async {
     final Map<String, dynamic> data = {
       'cpName': cpName,
@@ -48,7 +52,13 @@ class CPViewModel extends ChangeNotifier {
       'advisorReachedBy': advisorReachedBy,
       'callerRef': callerRef,
       'status': status,
-      'reraId': reraId, // <-- Database me save hoga
+      'reraId': reraId,
+      'email': email ?? '',
+      'password': password ?? '',
+      'role': 'cp',
+      'isActive': status.toLowerCase() == 'active',
+      'parentUid': parentUid,
+      'addedBy': addedBy,
     };
 
     if (id != null && id.isNotEmpty) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/cp_viewmodel.dart';
 
 class AddCPView extends StatefulWidget {
@@ -19,7 +20,9 @@ class _AddCPViewState extends State<AddCPView> {
   final TextEditingController _officeRefController = TextEditingController();
   final TextEditingController _advisorController = TextEditingController();
   final TextEditingController _callerRefController = TextEditingController();
-  final TextEditingController _reraIdController = TextEditingController(); // <-- NAYA: RERA ID ke liye
+  final TextEditingController _reraIdController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController(); // NAYA: Email for login
+  final TextEditingController _passwordController = TextEditingController(); // NAYA: Password for login
 
   String selectedStatus = 'Active'; // Default status
   bool _isSaving = false; // Loading animation ke liye naya variable
@@ -68,6 +71,13 @@ class _AddCPViewState extends State<AddCPView> {
             _buildTextField('Advisor Reached By', _advisorController),
             const SizedBox(height: 16),
             _buildTextField('Caller Ref.', _callerRefController),
+            const SizedBox(height: 16),
+            const Divider(),
+            const Text('Login Credentials', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+            const SizedBox(height: 12),
+            _buildTextField('Login Email', _emailController, isRequired: true),
+            const SizedBox(height: 16),
+            _buildTextField('Login Password', _passwordController, isRequired: true),
             const SizedBox(height: 24),
 
             const Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -101,6 +111,8 @@ class _AddCPViewState extends State<AddCPView> {
                   });
 
                   try {
+                    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+                    
                     // --- NAYA LOGIC: Yahan addOrUpdateCP call kiya aur reraId bheja ---
                     await Provider.of<CPViewModel>(context, listen: false).addOrUpdateCP(
                       cpName: _cpNameController.text,
@@ -111,7 +123,11 @@ class _AddCPViewState extends State<AddCPView> {
                       advisorReachedBy: _advisorController.text,
                       callerRef: _callerRefController.text,
                       status: selectedStatus,
-                      reraId: _reraIdController.text, // Database me jayega
+                      reraId: _reraIdController.text,
+                      email: _emailController.text.trim(),
+                      password: _passwordController.text.trim(),
+                      parentUid: authVM.userUid,
+                      addedBy: authVM.userName,
                     );
 
                     // Context await ke baad use karne se pehle mounted check karte hain

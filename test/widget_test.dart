@@ -1,18 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:provider/provider.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
 
-// Ensure the package name matches your project name in pubspec.yaml
-import 'package:rswa/main.dart';
+import 'package:rswa/viewmodels/auth_viewmodel.dart';
+import 'package:rswa/views/auth/login_view.dart';
 
 void main() {
-  testWidgets('App loads and shows Dashboard smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame using the new class name
-    await tester.pumpWidget(const RSWAApp());
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-    // Wait for GoRouter to finish its initial navigation animation
+  setUp(() {
+    // SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('shows the email and password login screen', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => AuthViewModel(),
+        child: const MaterialApp(home: LoginView()),
+      ),
+    );
+
     await tester.pumpAndSettle();
 
-    // Verify that our Dashboard screen has loaded by finding the 'Dashboard' text
-    expect(find.text('Dashboard'), findsWidgets);
+    expect(find.text('Welcome to RSWA'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Email'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Password'), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
   });
 }

@@ -3,13 +3,15 @@ class LeadModel {
   final String name;
   final String contact;
   final String status;
-  final Map<String, dynamic> rawData; // <-- NAYA FIELD: Pura Firebase data pakadne ke liye
+  final List<String> favUids; // 🚀 NAYA: To track favorites
+  final Map<String, dynamic> rawData; 
 
   LeadModel({
     required this.id,
     required this.name,
     required this.contact,
     required this.status,
+    required this.favUids,
     required this.rawData,
   });
 
@@ -17,11 +19,12 @@ class LeadModel {
   factory LeadModel.fromMap(Map<String, dynamic> data, String documentId) {
     return LeadModel(
       id: documentId,
-      name: data['name'] ?? 'Unknown',
+      name: data['name'] ?? data['fullName'] ?? 'Unknown',
       // Ab whatsapp ya contact2 me se koi ek yahan dikhega
-      contact: data['whatsapp'] ?? data['contact2'] ?? 'No Contact',
+      contact: data['whatsapp'] ?? data['contact1'] ?? data['contact2'] ?? 'No Contact',
       status: data['status'] ?? 'Cold',
-      rawData: data, // <-- Saare 30 fields automatically yahan aa jayenge
+      favUids: List<String>.from(data['favUids'] ?? []),
+      rawData: data, // <-- Saare fields automatically yahan aa jayenge
     );
   }
 }

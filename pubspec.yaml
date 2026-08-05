@@ -39,6 +39,21 @@ dependencies:
   provider: ^6.1.5+1
   cloud_firestore: ^6.5.0
   url_launcher: ^6.3.2
+  image_picker: ^1.1.2 # Camera/Gallery se photo lene ke liye
+  file_picker: ^8.0.3  # File upload/selection ke liye
+
+  # --- LOCAL SESSION ---
+  shared_preferences: ^2.3.2
+
+  # --- UTILITIES ---
+  intl: ^0.19.0        # Dates aur currency formatting ke liye
+  http: ^1.6.0
+  geolocator: ^13.0.1
+  geocoding: ^3.0.0
+  geolocator_web: ^4.1.4
+  firebase_auth: ^6.5.6
+  google_sign_in: ^7.2.0
+  google_nav_bar: ^5.0.6
 
 dev_dependencies:
   flutter_test:

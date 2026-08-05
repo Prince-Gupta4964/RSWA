@@ -1,30 +1,73 @@
 import 'package:go_router/go_router.dart';
 import '../models/lead_model.dart';
 import '../models/project_model.dart';
-import '../models/cp_model.dart'; // <-- NAYA: CP Model ka import add kiya
+import '../models/cp_model.dart';
+import '../views/auth/login_view.dart';
 import '../views/dashboard/dashboard_view.dart';
+import '../views/admin/admin_console_view.dart';
+import '../views/forms/custom_form_view.dart';
 import '../views/leads/add_lead_view.dart';
 import '../views/leads/lead_detail_view.dart';
 import '../views/cp_network/add_cp_view.dart';
 import '../views/cp_network/cp_list_view.dart';
-import '../views/cp_network/cp_detail_view.dart'; // <-- NAYA: CP Detail View ka import add kiya
+import '../views/cp_network/cp_detail_view.dart';
 import '../views/projects/add_project_view.dart';
 import '../views/projects/project_list_view.dart';
 import '../views/projects/project_detail_view.dart';
+import '../views/projects/city_selection_view.dart';
+import '../views/builders/builder_list_view.dart';
+import '../views/builders/add_builder_view.dart';
+import '../views/builders/builder_detail_view.dart';
+import '../models/builder_model.dart';
+import '../widgets/auth_guard.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
-    initialLocation: '/dashboard',
+    initialLocation: '/login',
     routes: [
       GoRoute(
-        path: '/dashboard',
-        builder: (context, state) => const DashboardView(),
+        path: '/login',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: LoginView()),
       ),
+      // --- MAIN TABS (Smooth No Transition for Bottom Nav) ---
+      GoRoute(
+        path: '/dashboard',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: AuthGuard(child: DashboardView())),
+      ),
+      GoRoute(
+        path: '/cp-list',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: AuthGuard(child: CPListView())),
+      ),
+      GoRoute(
+        path: '/projects',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: AuthGuard(child: ProjectListView())),
+      ),
+      GoRoute(
+        path: '/admin-console',
+        builder: (context, state) => const AuthGuard(child: AdminConsoleView()),
+      ),
+      GoRoute(
+        path: '/builders',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: AuthGuard(child: BuilderListView())),
+      ),
+      GoRoute(
+        path: '/custom-form/:formId',
+        builder: (context, state) => AuthGuard(
+          child: CustomFormView(formId: state.pathParameters['formId'] ?? ''),
+        ),
+      ),
+
+      // --- SUB SCREENS (Default Slide Animation) ---
       GoRoute(
         path: '/add-lead',
         builder: (context, state) {
           final lead = state.extra as LeadModel?;
-          return AddLeadView(lead: lead);
+          return AuthGuard(child: AddLeadView(lead: lead));
         },
       ),
       GoRoute(
@@ -36,47 +79,57 @@ class AppRouter {
               name: 'No Data Found (Go Back)',
               contact: '',
               status: '',
+              favUids: const [],
               rawData: {},
             );
-            return LeadDetailView(lead: emptyLead);
+            return AuthGuard(child: LeadDetailView(lead: emptyLead));
           }
           final lead = state.extra as LeadModel;
-          return LeadDetailView(lead: lead);
+          return AuthGuard(child: LeadDetailView(lead: lead));
         },
-      ),
-
-      // --- CP Network Routes ---
-      GoRoute(
-        path: '/cp-list',
-        builder: (context, state) => const CPListView(),
       ),
       GoRoute(
         path: '/add-cp',
-        builder: (context, state) => const AddCPView(),
+        builder: (context, state) => const AuthGuard(child: AddCPView()),
       ),
-      // --- NAYA ROUTE: CP Detail/Profile Page ke liye ---
       GoRoute(
         path: '/cp-detail',
         builder: (context, state) {
           final cp = state.extra as CPModel;
-          return CPDetailView(cp: cp);
+          return AuthGuard(child: CPDetailView(cp: cp));
         },
-      ),
-
-      // --- Projects Inventory Routes ---
-      GoRoute(
-        path: '/projects',
-        builder: (context, state) => const ProjectListView(),
       ),
       GoRoute(
         path: '/add-project',
-        builder: (context, state) => const AddProjectView(),
+        builder: (context, state) {
+          final project = state.extra as ProjectModel?;
+          return AuthGuard(child: AddProjectView(project: project));
+        },
       ),
       GoRoute(
         path: '/project-detail',
         builder: (context, state) {
           final project = state.extra as ProjectModel;
-          return ProjectDetailView(project: project);
+          return AuthGuard(child: ProjectDetailView(project: project));
+        },
+      ),
+      GoRoute(
+        path: '/city-select',
+        builder: (context, state) =>
+            const AuthGuard(child: CitySelectionView()),
+      ),
+      GoRoute(
+        path: '/add-builder',
+        builder: (context, state) {
+          final builder = state.extra as BuilderModel?;
+          return AuthGuard(child: AddBuilderView(builder: builder));
+        },
+      ),
+      GoRoute(
+        path: '/builder-detail',
+        builder: (context, state) {
+          final builder = state.extra as BuilderModel;
+          return AuthGuard(child: BuilderDetailView(builder: builder));
         },
       ),
     ],

@@ -8,8 +8,10 @@ class CPModel {
   final String advisorReachedBy;
   final String callerRef;
   final String status;
-  final String reraId; // <-- NAYA: RERA ID add kiya
-  final Map<String, dynamic> rawData; // <-- NAYA: Leads track karne ke liye zaroori hai
+  final String reraId;
+  final String? parentUid; // <-- NAYA: Kisne add kiya uski ID
+  final String? addedBy;   // <-- NAYA: Kisne add kiya uska Naam
+  final Map<String, dynamic> rawData;
 
   CPModel({
     required this.id,
@@ -22,6 +24,8 @@ class CPModel {
     required this.callerRef,
     required this.status,
     required this.reraId,
+    this.parentUid,
+    this.addedBy,
     required this.rawData,
   });
 
@@ -36,7 +40,9 @@ class CPModel {
       advisorReachedBy: data['advisorReachedBy'] ?? '',
       callerRef: data['callerRef'] ?? '',
       status: data['status'] ?? 'Pending',
-      reraId: data['reraId'] ?? 'N/A', // <-- NAYA: Default value 'N/A' set ki hai
+      reraId: data['reraId'] ?? 'N/A',
+      parentUid: data['parentUid'],
+      addedBy: data['addedBy'],
       rawData: data,
     );
   }

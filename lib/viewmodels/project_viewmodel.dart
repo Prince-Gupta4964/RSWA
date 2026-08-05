@@ -15,15 +15,23 @@ class ProjectViewModel extends ChangeNotifier {
   }
 
   void fetchProjects() {
-    _db.collection('projects').snapshots().listen((snapshot) {
-      _projects = snapshot.docs.map((doc) => ProjectModel.fromMap(doc.data(), doc.id)).toList();
-      _isLoading = false;
-      notifyListeners();
-    }, onError: (error) {
-      print("Firebase Fetch Error: $error");
-      _isLoading = false;
-      notifyListeners();
-    });
+    _db
+        .collection('projects')
+        .snapshots()
+        .listen(
+          (snapshot) {
+            _projects = snapshot.docs
+                .map((doc) => ProjectModel.fromMap(doc.data(), doc.id))
+                .toList();
+            _isLoading = false;
+            notifyListeners();
+          },
+          onError: (error) {
+            print("Firebase Fetch Error: $error");
+            _isLoading = false;
+            notifyListeners();
+          },
+        );
   }
 
   Future<void> addOrUpdateProject({
@@ -35,6 +43,11 @@ class ProjectViewModel extends ChangeNotifier {
     required String contactPerson,
     required String contactNumber,
     required Map<String, dynamic> propertyDetails,
+    List<String>? builderIds,
+    String? actorUid,
+    String? actorEmail,
+    String? actorName,
+    String? actorRole,
   }) async {
     final Map<String, dynamic> data = {
       'projectName': projectName,
@@ -44,20 +57,80 @@ class ProjectViewModel extends ChangeNotifier {
       'contactPerson': contactPerson,
       'contactNumber': contactNumber,
       'propertyDetails': propertyDetails,
+      'builderIds': builderIds ?? [],
+      'createdByUid': actorUid, // Explicitly save for filtering
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedBy': {
+        'uid': actorUid ?? '',
+        'email': actorEmail ?? '',
+        'name': actorName ?? '',
+        'role': actorRole ?? '',
+      },
     };
 
     if (id != null && id.isNotEmpty) {
       await _db.collection('projects').doc(id).update(data);
     } else {
       data['timestamp'] = FieldValue.serverTimestamp();
+      data['createdBy'] = {
+        'uid': actorUid ?? '',
+        'email': actorEmail ?? '',
+        'name': actorName ?? '',
+        'role': actorRole ?? '',
+      };
       await _db.collection('projects').add(data);
     }
   }
 
   // --- NAYA FUNCTION: Inventory Add Karne Ke Liye ---
-  Future<void> addInventory(String projectId, Map<String, dynamic> inventoryData) async {
+  Future<void> addInventory(
+    String projectId,
+    Map<String, dynamic> inventoryData,
+  ) async {
     inventoryData['timestamp'] = FieldValue.serverTimestamp();
     // Project ke andar 'inventory' naam ka sub-folder (sub-collection) banega
-    await _db.collection('projects').doc(projectId).collection('inventory').add(inventoryData);
+    await _db
+        .collection('projects')
+        .doc(projectId)
+        .collection('inventory')
+        .add(inventoryData);
+  }
+
+  // --- DELETE PROJECT FUNCTION ---
+  Future<void> deleteProject(String projectId) async {
+    try {
+      // Delete all inventory items in subcollection
+      final inventoryDocs = await _db
+          .collection('projects')
+          .doc(projectId)
+          .collection('inventory')
+          .get();
+      for (var doc in inventoryDocs.docs) {
+        await doc.reference.delete();
+      }
+      // Delete the project
+      await _db.collection('projects').doc(projectId).delete();
+    } catch (e) {
+      print("Error deleting project: $e");
+      rethrow;
+    }
+  }
+
+  // --- DELETE MULTIPLE PROJECTS ---
+  Future<void> deleteMultipleProjects(List<String> projectIds) async {
+    try {
+      for (String projectId in projectIds) {
+        await deleteProject(projectId);
+      }
+    } catch (e) {
+      print("Error deleting multiple projects: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> toggleHotStatus(String projectId, bool isHot) async {
+    await _db.collection('projects').doc(projectId).update({
+      'isHot': isHot,
+    });
   }
 }

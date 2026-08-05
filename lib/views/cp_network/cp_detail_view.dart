@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../models/cp_model.dart';
 import '../../viewmodels/lead_viewmodel.dart';
+import '../../viewmodels/project_viewmodel.dart'; // <-- NAYA: Project VM
+import '../../models/project_model.dart';
 
 class CPDetailView extends StatelessWidget {
   final CPModel cp;
@@ -109,6 +111,32 @@ class CPDetailView extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 20),
+
+          // --- SECTION: ASSOCIATED PROJECTS ---
+          const SizedBox(height: 20),
+          Text(
+            'Assigned Projects',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+          ),
+          const SizedBox(height: 10),
+          Consumer<ProjectViewModel>(
+            builder: (context, projectVM, child) {
+              final assignedProjects = projectVM.projects.where((p) => p.contactPerson == cp.cpName).toList();
+              if (assignedProjects.isEmpty) return const Text('No projects assigned to this partner.', style: TextStyle(color: Colors.grey, fontSize: 13));
+              return Column(
+                children: assignedProjects.map((p) => Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    title: Text(p.projectName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: Text(p.propertyType, style: const TextStyle(fontSize: 12)),
+                    trailing: const Icon(Icons.chevron_right, size: 18),
+                    onTap: () => context.push('/project-detail', extra: p),
+                  ),
+                )).toList(),
+              );
+            },
           ),
           const SizedBox(height: 20),
 
