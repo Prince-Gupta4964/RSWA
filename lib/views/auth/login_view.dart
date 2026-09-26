@@ -6,7 +6,9 @@ import '../../viewmodels/auth_viewmodel.dart';
 import '../../widgets/google_auth_button/google_auth_button.dart';
 
 class LoginView extends StatefulWidget {
-  const LoginView({super.key});
+  final String? initialReferralCode;
+  final String? mode; // 🚀 NAYA
+  const LoginView({super.key, this.initialReferralCode, this.mode});
 
   @override
   State<LoginView> createState() => _LoginViewState();
@@ -16,6 +18,7 @@ class _LoginViewState extends State<LoginView> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  late final TextEditingController _referralController; // 🚀 NAYA
   bool _isLoading = false;
   bool _isPasswordHidden = true;
   
@@ -30,6 +33,16 @@ class _LoginViewState extends State<LoginView> {
   @override
   void initState() {
     super.initState();
+    _referralController = TextEditingController(text: widget.initialReferralCode);
+    
+    // 🚀 NAYA: Immediately sync the referral code from URL to the ViewModel
+    if (widget.initialReferralCode != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Provider.of<AuthViewModel>(context, listen: false)
+            .updateReferralCode(widget.initialReferralCode);
+      });
+    }
+
     if (kIsWeb) {
       // If we don't have a session in LocalStorage, Google SDK might still auto-login.
       // We give it a short window to emit the user before showing the login form.
@@ -130,28 +143,40 @@ class _LoginViewState extends State<LoginView> {
                 // --- COMPANY LOGO / BRANDING ---
                 Center(
                   child: Container(
-                    height: 100,
-                    width: 100,
+                    height: 110,
+                    width: 110,
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: _primaryLight.withValues(alpha: 0.3),
+                      color: Colors.white,
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 15,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: Center(
-                      child: Icon(
-                        Icons.real_estate_agent_rounded,
-                        size: 50,
-                        color: _primaryDark,
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/logo.png',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.real_estate_agent_rounded,
+                          size: 50,
+                          color: _primaryDark,
+                        ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
 
                 const Text(
-                  'Welcome to RSWA',
+                  'Welcome to Property Plus',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 26,
                     fontWeight: FontWeight.w900,
                     color: Colors.black87,
                   ),
@@ -171,15 +196,38 @@ class _LoginViewState extends State<LoginView> {
 
                 const SizedBox(height: 48),
 
+                // 🚀 NAYA: Referral Code Input for New Partners
+                TextField(
+                  controller: _referralController,
+                  readOnly: widget.initialReferralCode != null,
+                  onChanged: (val) => authVM.updateReferralCode(val), // 🚀 Sync with VM
+                  decoration: _inputDecoration(
+                    label: widget.initialReferralCode != null ? 'Referrer Detected' : 'Referral Code (Optional)',
+                    hint: 'Enter code if you are a new partner',
+                    icon: Icons.card_giftcard_rounded,
+                  ).copyWith(
+                    fillColor: widget.initialReferralCode != null ? Colors.grey.shade50 : Colors.white,
+                    filled: true,
+                  ),
+                  style: TextStyle(
+                    color: widget.initialReferralCode != null ? Colors.grey.shade600 : Colors.black87,
+                    fontWeight: widget.initialReferralCode != null ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  textCapitalization: TextCapitalization.characters,
+                ),
+                const SizedBox(height: 16),
+
                 // 🚀 GOOGLE SIGN-IN at TOP (As requested)
-                // This will automatically show "Continue as [Name]" on Web
                 if (!_isLoading)
                   Center(
                     child: buildGoogleSignInButton(
                       context: context,
                       onPressed: () async {
                         setState(() => _isLoading = true);
-                        final error = await authVM.signInWithGoogle();
+                        final error = await authVM.signInWithGoogle(
+                          referralCode: _referralController.text.trim().toUpperCase(),
+                          mode: widget.mode, // 🚀 NAYA
+                        );
                         setState(() => _isLoading = false);
                         if (error != null) {
                           ScaffoldMessenger.of(context).showSnackBar(

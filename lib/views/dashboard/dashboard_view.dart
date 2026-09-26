@@ -1,17 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/lead_model.dart';
 import '../../services/storage_helper.dart';
 import '../../utils/record_access.dart';
+import '../../utils/role_permissions.dart';
 import '../../viewmodels/app_configuration_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/lead_viewmodel.dart';
-import '../../widgets/app_bottom_nav.dart';
 import '../leads/lead_list_view.dart';
+import '../cp_network/complete_profile_view.dart';
+import '../../widgets/app_drawer.dart';
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -23,14 +26,17 @@ class DashboardView extends StatefulWidget {
 class _DashboardViewState extends State<DashboardView> with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _topKey = GlobalKey();
-  final GlobalKey _monitoringKey = GlobalKey();
+  final FocusNode _searchFocusNode = FocusNode(); // 🚀 NAYA: Focus control
 
   String _currentNavTab = '';
   String _searchQuery = '';
+  // ignore: unused_field
   String? _statusFilter;
 
   // 🚀 NAYA: Search bar toggle state
   bool _isSearching = false;
+  int? _lastSearchTriggerCount; // 🚀 Track triggers
+  int? _lastFilterTriggerCount; // 🚀 NAYA: Track filter triggers
 
   late TabController _tabController;
   late List<Map<String, String>> _tabs;
@@ -42,8 +48,8 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
 
     _tabs = [
-      if (authVM.canSeeAllLeads) {'id': 'all_clients', 'label': 'All Clients'},
       {'id': 'my_leads', 'label': 'My Clients'},
+      if (authVM.canSeeAllLeads) {'id': 'all_clients', 'label': 'All Clients'},
       {'id': 'paid_leads', 'label': 'Paid'},
       {'id': 'advisor', 'label': 'Advisor'},
       {'id': 'fav_leads', 'label': 'Fav'},
@@ -51,18 +57,22 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
 
     _tabController = TabController(length: _tabs.length, vsync: this);
 
-    if (authVM.canSeeAllLeads) {
-      _currentNavTab = 'all_clients';
-      _tabController.index = 0;
-    } else {
-      _currentNavTab = 'my_leads';
-      _tabController.index = 0;
-    }
+    _currentNavTab = 'my_leads';
+    _tabController.index = 0;
 
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {
           _currentNavTab = _tabs[_tabController.index]['id']!;
+        });
+      }
+    });
+
+    // 🚀 NAYA: Auto-close search when focus is lost
+    _searchFocusNode.addListener(() {
+      if (!_searchFocusNode.hasFocus && _isSearching && _searchQuery.isEmpty) {
+        setState(() {
+          _isSearching = false;
         });
       }
     });
@@ -99,33 +109,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     }
   }
 
-  Future<void> _scrollToSection(GlobalKey key, {required String navTab}) async {
-    setState(() {
-      _currentNavTab = navTab;
-      int idx = _tabs.indexWhere((t) => t['id'] == navTab);
-      if (idx != -1) _tabController.index = idx;
-    });
-
-    if (key == _topKey) {
-      await _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOut,
-      );
-      return;
-    }
-    final sectionContext = key.currentContext;
-    if (sectionContext == null) return;
-
-    await Scrollable.ensureVisible(
-      sectionContext,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOut,
-      alignment: 0.08,
-    );
-  }
-
-  void _showSortFilterSheet(LeadViewModel leadVM) {
+  void _showSortFilterSheet(LeadViewModel leadVM, String tabId) {
     final List<String> bhkOptions = leadVM.leads
         .map((l) => l.rawData['needsBHK']?.toString() ?? '')
         .where((s) => s.isNotEmpty)
@@ -136,8 +120,19 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       {'label': 'Date (Newest)', 'field': 'Date', 'asc': false, 'icon': Icons.calendar_today},
       {'label': 'Date (Oldest)', 'field': 'Date', 'asc': true, 'icon': Icons.history},
       {'label': 'Name (A-Z)', 'field': 'Name', 'asc': true, 'icon': Icons.sort_by_alpha},
-      {'label': 'Final Amount (High to Low)', 'field': 'Final Amount', 'asc': false, 'icon': Icons.currency_rupee},
-      {'label': 'Monthly Income (High to Low)', 'field': 'Monthly Income', 'asc': false, 'icon': Icons.payments_outlined},
+      {'label': 'Name (Z-A)', 'field': 'Name', 'asc': false, 'icon': Icons.sort_by_alpha},
+      {'label': 'Budget (High to Low)', 'field': 'Budget', 'asc': false, 'icon': Icons.currency_rupee},
+      {'label': 'Budget (Low to High)', 'field': 'Budget', 'asc': true, 'icon': Icons.currency_rupee},
+      {'label': 'Total Days (Oldest first)', 'field': 'Total Days', 'asc': true, 'icon': Icons.timelapse},
+      {'label': 'Total Days (Newest first)', 'field': 'Total Days', 'asc': false, 'icon': Icons.timelapse},
+      {'label': 'Total Calls (Most first)', 'field': 'Total Calls', 'asc': false, 'icon': Icons.call},
+      {'label': 'Final Amount (High to Low)', 'field': 'Final Amount', 'asc': false, 'icon': Icons.payments_outlined},
+    ];
+
+    final List<String> groupByOptions = [
+      'Status', 'Company', 'Project', 'Source', 'Referral', 
+      'Nearest Station', 'Advisor', 'Caller', 'Reached By', 'Created Month', 
+      'Configuration', 'Gender', 'Demo Done'
     ];
 
     showModalBottomSheet(
@@ -149,7 +144,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         return StatefulBuilder(
           builder: (context, setSheetState) {
             return DraggableScrollableSheet(
-              initialChildSize: 0.6,
+              initialChildSize: 0.7,
               maxChildSize: 0.9,
               minChildSize: 0.4,
               expand: false,
@@ -160,8 +155,33 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                   children: [
                     Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
                     const SizedBox(height: 24),
-                    const Text('Sort & Filter', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    Text('Group & Sort: ${_tabs.firstWhere((t) => t['id'] == tabId)['label']}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 24),
+
+                    // --- GROUP BY SECTION ---
+                    const Text('GROUP BY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.grey, letterSpacing: 1)),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: groupByOptions.map((opt) {
+                        final bool isSelected = leadVM.getGroupBy(tabId) == opt;
+                        return ChoiceChip(
+                          label: Text(opt, style: const TextStyle(fontSize: 12)),
+                          selected: isSelected,
+                          selectedColor: const Color(0xFFFF6B22).withValues(alpha: 0.2),
+                          checkmarkColor: const Color(0xFFFF6B22),
+                          labelStyle: TextStyle(color: isSelected ? const Color(0xFFFF6B22) : Colors.black87, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal),
+                          onSelected: (val) {
+                            if (val) {
+                              leadVM.setGroupBy(tabId, opt);
+                              setSheetState(() {});
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 32),
 
                     // --- SORTING SECTION ---
                     const Text('SORT BY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.grey, letterSpacing: 1)),
@@ -170,7 +190,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                       spacing: 8,
                       runSpacing: 8,
                       children: sortOptions.map((opt) {
-                        final bool isSelected = leadVM.sortBy == opt['field'] && leadVM.isAscending == opt['asc'];
+                        final bool isSelected = leadVM.getSortBy(tabId) == opt['field'] && leadVM.getIsAscending(tabId) == opt['asc'];
                         return ChoiceChip(
                           label: Text(opt['label'], style: const TextStyle(fontSize: 12)),
                           selected: isSelected,
@@ -179,7 +199,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                           labelStyle: TextStyle(color: isSelected ? const Color(0xFFFF6B22) : Colors.black87, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal),
                           onSelected: (val) {
                             if (val) {
-                              leadVM.setSort(opt['field'], opt['asc']);
+                              leadVM.setSort(tabId, opt['field'], opt['asc']);
                               setSheetState(() {});
                             }
                           },
@@ -195,12 +215,12 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                       spacing: 8,
                       runSpacing: 8,
                       children: bhkOptions.map((bhk) {
-                        final bool isSelected = leadVM.filters['needsBHK'] == bhk;
+                        final bool isSelected = leadVM.getFilters(tabId)['needsBHK'] == bhk;
                         return ChoiceChip(
                           label: Text(bhk, style: const TextStyle(fontSize: 12)),
                           selected: isSelected,
                           onSelected: (val) {
-                            leadVM.updateFilter('needsBHK', val ? bhk : null);
+                            leadVM.updateFilter(tabId, 'needsBHK', val ? bhk : null);
                             setSheetState(() {});
                           },
                         );
@@ -214,7 +234,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () {
-                              leadVM.clearFilters();
+                              leadVM.clearFilters(tabId);
                               Navigator.pop(context);
                             },
                             child: const Text('Clear All'),
@@ -241,88 +261,19 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     );
   }
 
-  void _openProfileSheet(AuthViewModel authVM) {
-    final messenger = ScaffoldMessenger.of(context);
-    final parentContext = context;
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.white,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  authVM.userName.isEmpty ? 'Signed In User' : authVM.userName,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  authVM.userEmail.isEmpty
-                      ? 'No email found'
-                      : authVM.userEmail,
-                  style: TextStyle(color: Colors.grey.shade700),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF1EA),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    authVM.roleLabel,
-                    style: const TextStyle(
-                      color: Color(0xFFFF6B22),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      await authVM.logout();
-                      if (!mounted) return;
-                      messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text('Logged out successfully.'),
-                        ),
-                      );
-                      if (parentContext.mounted) {
-                        parentContext.go('/login');
-                      }
-                    },
-                    icon: const Icon(Icons.logout),
-                    label: const Text('Logout'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  // 🚀 NAYA: Cleaned filter
+  String _getCreatorUid(dynamic createdBy) {
+    if (createdBy is Map) return createdBy['uid']?.toString() ?? '';
+    if (createdBy is String) return createdBy;
+    return '';
   }
 
-  // 🚀 NAYA: Cleaned filter
   List<LeadModel> _filterLeads(List<LeadModel> allLeads, String tabId, AuthViewModel authVM) {
     return allLeads.where((lead) {
       if (tabId == 'all_clients') {
         if (!authVM.canSeeAllLeads) return false;
       } else if (tabId == 'my_leads') {
-        final creatorUid = lead.rawData['createdBy']?['uid']?.toString() ?? '';
+        final creatorUid = _getCreatorUid(lead.rawData['createdBy']);
         if (creatorUid != authVM.userUid) return false;
       } else if (tabId == 'paid_leads') {
         final milestones = ['Visit', 'Revisit', 'Token', 'Loan process', 'Downpayment', 'Registration', 'Disbursement', 'Possession'];
@@ -331,7 +282,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         if (idx < 2) return false;
 
         if (!authVM.canSeeAllLeads) {
-          final creatorUid = lead.rawData['createdBy']?['uid']?.toString() ?? '';
+          final creatorUid = _getCreatorUid(lead.rawData['createdBy']);
           if (creatorUid != authVM.userUid) return false;
         }
       } else if (tabId == 'fav_leads') {
@@ -352,6 +303,40 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   Widget build(BuildContext context) {
     final authVM = Provider.of<AuthViewModel>(context);
     final leadVM = Provider.of<LeadViewModel>(context);
+    final configVM = Provider.of<AppConfigurationViewModel>(context); // 🚀 NAYA
+
+    // 🚀 NAYA: Handle Double-Tap Search Trigger
+    if (_lastSearchTriggerCount == null) {
+      _lastSearchTriggerCount = configVM.searchTriggerCount;
+    } else if (configVM.searchTriggerCount > _lastSearchTriggerCount! && configVM.activeSearchTab == 'dashboard') {
+      _lastSearchTriggerCount = configVM.searchTriggerCount;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _isSearching = true);
+          // 🚀 Tiny delay ensures the TextField is rendered before requesting focus
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) _searchFocusNode.requestFocus();
+          });
+        }
+      });
+    }
+
+    // 🚀 NAYA: Handle Long-Press Filter Trigger
+    if (_lastFilterTriggerCount == null) {
+      _lastFilterTriggerCount = configVM.leadFilterTriggerCount;
+    } else if (configVM.leadFilterTriggerCount > _lastFilterTriggerCount!) {
+      _lastFilterTriggerCount = configVM.leadFilterTriggerCount;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showSortFilterSheet(leadVM, _currentNavTab);
+        }
+      });
+    }
+
+    // 🚀 Navigation Guard: Incomplete profile always goes to CompleteProfileView
+    if (authVM.appRole == AppRole.cp && !authVM.isProfileComplete) {
+      return const CompleteProfileView();
+    }
 
     final allVisibleLeads = filterVisibleLeads(
       leads: leadVM.leads,
@@ -369,9 +354,34 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       return t2.compareTo(t1);
     });
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        
+        // 1. Close search if active (Explicitly unfocus too)
+        if (_isSearching) {
+          _searchFocusNode.unfocus();
+          setState(() {
+            _isSearching = false;
+            _searchQuery = '';
+          });
+          return;
+        }
+
+        // 2. Switch to first tab if not there
+        if (_tabController.index != 0) {
+          _tabController.animateTo(0);
+          return;
+        }
+
+        // 3. Otherwise, stay on dashboard (let system handle if we want to allow exit, but user said NO)
+        // If we want to allow exit on a double-back, we'd need more logic.
+        // For now, we stay on dashboard.
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -383,6 +393,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         ),
         title: _isSearching
             ? TextField(
+          focusNode: _searchFocusNode,
           autofocus: true,
           onChanged: (val) => setState(() => _searchQuery = val),
           decoration: const InputDecoration(
@@ -420,17 +431,21 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                 });
               },
             ),
+            IconButton(
+              icon: const Icon(Icons.tune_rounded, color: Colors.black),
+              onPressed: () => _showSortFilterSheet(leadVM, _currentNavTab),
+            ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, color: Colors.black),
               onSelected: (value) {
                 if (value == 'sort_filter') {
-                  _showSortFilterSheet(leadVM);
+                  _showSortFilterSheet(leadVM, _currentNavTab);
                 } else if (value == 'refresh') {
                   _handleHardRefresh();
                 } else if (value == 'notifications') {
                   // Do nothing
                 } else if (value == 'profile') {
-                  _openProfileSheet(authVM);
+                  context.push('/profile');
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -440,7 +455,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                     children: [
                       Icon(Icons.tune_rounded, color: Colors.black54),
                       SizedBox(width: 12),
-                      Text('Sort & Filter'),
+                      Text('Group By & Filter By'),
                     ],
                   ),
                 ),
@@ -470,7 +485,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                     children: [
                       Icon(Icons.person_outline_rounded, color: Colors.black54),
                       SizedBox(width: 12),
-                      Text('Profile'),
+                      Text('My Score'),
                     ],
                   ),
                 ),
@@ -480,7 +495,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
           const SizedBox(width: 8),
         ],
       ),
-      drawer: _buildAdminDrawer(authVM),
+      drawer: const AppDrawer(),
 
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
@@ -494,9 +509,29 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      SizedBox(height: 8),
-                      // Removed Priority Cards from here as requested
+                    children: [
+                      const SizedBox(height: 8),
+                      if (authVM.appRole == AppRole.cp && !authVM.isApproved)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.red.shade100),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.lock_clock_rounded, color: Colors.red.shade700, size: 20),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Text(
+                                  'Verification Pending: Leads & projects access will be enabled after Admin approval.',
+                                  style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -530,6 +565,32 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
           body: TabBarView(
             controller: _tabController,
             children: _tabs.map((tab) {
+              // 🚀 NAYA: Restricted view for unapproved CPs
+              if (authVM.appRole == AppRole.cp && !authVM.isApproved) {
+                 return Center(
+                   child: Padding(
+                     padding: const EdgeInsets.symmetric(horizontal: 40),
+                     child: Column(
+                       mainAxisAlignment: MainAxisAlignment.center,
+                       children: [
+                         Icon(Icons.lock_person_outlined, size: 64, color: Colors.grey.shade300),
+                         const SizedBox(height: 24),
+                         const Text(
+                           'Restricted Access',
+                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                         ),
+                         const SizedBox(height: 12),
+                         Text(
+                           'Your leads and project lists will be visible here once your profile is verified by an Admin.',
+                           textAlign: TextAlign.center,
+                           style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.5),
+                         ),
+                       ],
+                     ),
+                   ),
+                 );
+              }
+              
               final tabLeads = _filterLeads(allVisibleLeads, tab['id']!, authVM);
 
               return ListView(
@@ -537,6 +598,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                 children: [
                   const SizedBox(height: 12),
                   LeadListView(
+                    tabId: tab['id']!,
                     leads: tabLeads,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -551,108 +613,17 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         ),
       ),
 
-      floatingActionButton: authVM.permissions.canAddLeads
+      floatingActionButton: (authVM.permissions.canAddLeads && authVM.isApproved)
           ? Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: FloatingActionButton(
-          onPressed: () => context.push('/add-lead'),
-          backgroundColor: const Color(0xFFFF6B22),
-          child: const Icon(Icons.add, color: Colors.white, size: 28),
-        ),
-      )
+              padding: const EdgeInsets.only(bottom: 20),
+              child: FloatingActionButton(
+                heroTag: 'dashboard_fab',
+                onPressed: () => context.push('/add-lead'),
+                backgroundColor: const Color(0xFFFBE64E),
+                child: const Icon(Icons.add, color: Color(0xFF6B5800), size: 28),
+              ),
+            )
           : null,
-
-      bottomNavigationBar: AppBottomNav(
-        currentTab: 'dashboard',
-        backgroundColor: Colors.white,
-        activeIconColor: Colors.black87,
-        activeLabelColor: Colors.black87,
-        inactiveIconColor: Colors.grey.shade400,
-        activeBackgroundColor: Colors.transparent,
-        projectsLabel: 'Projects',
-        cpLabel: 'Network',
-        onDashboardTap: () {
-          setState(() {
-            _currentNavTab = 'my_leads';
-            int idx = _tabs.indexWhere((t) => t['id'] == 'my_leads');
-            if (idx != -1) _tabController.index = idx;
-          });
-          _scrollToSection(_topKey, navTab: 'my_leads');
-        },
-        onMonitoringTap: authVM.canSeeMonitoring
-            ? () => _scrollToSection(_monitoringKey, navTab: 'monitoring')
-            : null,
-        onAdminTap: authVM.canManageUsers || authVM.permissions.canManageRoles
-            ? () => context.go('/admin-console')
-            : null,
-      ),
-    );
-  }
-
-  Widget? _buildAdminDrawer(AuthViewModel authVM) {
-    if (!authVM.canSeeMonitoring && !authVM.canManageUsers) return null;
-
-    return Drawer(
-      backgroundColor: Colors.white,
-      child: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: const Color(0xFFFF6B22),
-                    child: Text(
-                      authVM.userName.isEmpty ? '?' : authVM.userName[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        authVM.userName,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        authVM.roleLabel,
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                      ),
-                    ],
-                  )
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.dashboard_outlined),
-              title: const Text('Overview'),
-              onTap: () => Navigator.pop(context),
-            ),
-            if (authVM.canManageUsers)
-              ListTile(
-                leading: const Icon(Icons.people_outline),
-                title: const Text('User Management'),
-                onTap: () => context.go('/admin-console'),
-              ),
-            ListTile(
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text('Form Settings'),
-              onTap: () {},
-            ),
-            const Spacer(),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Logout', style: TextStyle(color: Colors.red)),
-              onTap: () => authVM.logout(),
-            ),
-            const SizedBox(height: 10),
-          ],
-        ),
       ),
     );
   }

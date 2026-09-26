@@ -9,6 +9,8 @@ class ProjectModel {
   final Map<String, dynamic> propertyDetails;
   final List<String> builderIds;
   final bool isHot;
+  final bool isApproved;
+  final bool isDeleted; // 🚀 NAYA
   final String? createdByUid;
   final Map<String, dynamic> rawData;
   final String? coverImage;
@@ -24,12 +26,16 @@ class ProjectModel {
     required this.propertyDetails,
     this.builderIds = const [],
     this.isHot = false,
+    this.isApproved = false,
+    this.isDeleted = false, // 🚀 NAYA
     this.createdByUid,
     required this.rawData,
     this.coverImage,
   });
 
   factory ProjectModel.fromMap(Map<String, dynamic> data, String documentId) {
+    final dynamic cb = data['createdBy'];
+    final String? cbUid = cb is Map ? cb['uid']?.toString() : (cb is String ? cb : null);
     return ProjectModel(
       id: documentId,
       projectName: data['projectName'] ?? 'Unknown Project',
@@ -38,10 +44,12 @@ class ProjectModel {
       propertyType: data['propertyType'] ?? 'Flat',
       contactPerson: data['contactPerson'] ?? '',
       contactNumber: data['contactNumber'] ?? '',
-      propertyDetails: data['propertyDetails'] ?? {},
-      builderIds: List<String>.from(data['builderIds'] ?? []),
+      propertyDetails: data['propertyDetails'] is Map ? data['propertyDetails'] : {},
+      builderIds: (data['builderIds'] is Iterable) ? List<String>.from(data['builderIds']) : [],
       isHot: data['isHot'] == true,
-      createdByUid: data['createdByUid'] ?? data['createdBy']?['uid'],
+      isApproved: data['isApproved'] == 'Yes' || data['isApproved'] == true,
+      isDeleted: data['isDeleted'] == true, // 🚀 NAYA
+      createdByUid: data['createdByUid']?.toString() ?? cbUid,
       rawData: data,
       coverImage: data['coverImage'],
     );

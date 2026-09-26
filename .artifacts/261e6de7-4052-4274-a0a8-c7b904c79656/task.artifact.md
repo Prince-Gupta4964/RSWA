@@ -1,0 +1,13 @@
+- [x] Seamless Search Bar Closure
+    - [x] Add focus listener to auto-close search in `DashboardView`
+    - [x] Add focus listener to auto-close search in `ProjectListView`
+    - [x] Add focus listener to auto-close search in `CPListView`
+    - [x] Update `PopScope` logic to explicitly unfocus and close search
+- [x] Create "My Profile" Navigation Tab
+    - [x] Implement `MyProfileView` with metrics and membership details
+    - [x] Align Package, Status, and Role tags in consistent UI style
+    - [x] Add new `StatefulShellBranch` in `AppRouter` for persistent profile tab
+- [x] Redesign CP List View to match Lead List View
+- [x] Fix TabBar responsiveness on mobile
+- [x] Add "New CP" sub-tab
+- [x] Project Form & Admin Restrictions

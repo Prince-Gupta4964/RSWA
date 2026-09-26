@@ -1,29 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/builder_viewmodel.dart';
 import '../../viewmodels/project_viewmodel.dart';
+import '../../models/cp_model.dart';
 import '../../widgets/app_bottom_nav.dart';
+import '../../widgets/app_drawer.dart';
 
 class BuilderListView extends StatelessWidget {
   const BuilderListView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final authVM = Provider.of<AuthViewModel>(context);
     final builderVM = Provider.of<BuilderViewModel>(context);
     final projectVM = Provider.of<ProjectViewModel>(context);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Builders', style: TextStyle(fontWeight: FontWeight.bold)),
+    if (!authVM.canManageUsers) {
+      return const Scaffold(
+        body: Center(child: Text("Access Denied")),
+      );
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        StatefulNavigationShell.of(context).goBranch(0);
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.go('/dashboard'),
+        appBar: AppBar(
+          title: const Text('Builders', style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu, color: Colors.black),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ),
         ),
-      ),
+      drawer: const AppDrawer(),
       body: builderVM.isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B22)))
           : ListView.separated(
@@ -35,13 +54,16 @@ class BuilderListView extends StatelessWidget {
                 final projectCount = projectVM.projects.where((p) => p.builderIds.contains(builder.id)).length;
 
                 return ListTile(
-                  onTap: () => context.push('/builder-detail', extra: builder),
+                  onTap: () {
+                    final cpModel = CPModel.fromMap(builder.rawData, builder.id);
+                    context.push('/cp-detail/${builder.id}', extra: cpModel);
+                  },
                   leading: CircleAvatar(
                     backgroundColor: const Color(0xFFFFF1EA),
                     child: Text(builder.name.isEmpty ? 'B' : builder.name[0].toUpperCase(), style: const TextStyle(color: Color(0xFFFF6B22))),
                   ),
                   title: Text(builder.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(builder.companyName),
+                  subtitle: Text(builder.companyNames.isEmpty ? 'No Company' : builder.companyNames.join(', ')),
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -54,25 +76,10 @@ class BuilderListView extends StatelessWidget {
               },
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/add-builder'),
-        backgroundColor: const Color(0xFFFF6B22),
-        child: const Icon(Icons.add, color: Colors.white),
+        onPressed: () => context.push('/add-cp'),
+        backgroundColor: const Color(0xFFFBE64E),
+        child: const Icon(Icons.add, color: Color(0xFF6B5800)),
       ),
-      bottomNavigationBar: const AppBottomNav(
-        currentTab: 'builders',
-        backgroundColor: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-        border: Border.fromBorderSide(
-          BorderSide(color: Color(0xFFFF6B22), width: 1),
-        ),
-        activeBackgroundColor: Color(0xFFFF6B22),
-        activeIconColor: Colors.white,
-        activeLabelColor: Color(0xFFFF6B22),
-        inactiveIconColor: Color(0xFFFF6B22),
-      ),
-    );
+    ));
   }
 }

@@ -44,40 +44,47 @@ class _AddBuilderViewState extends State<AddBuilderView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text(widget.builder == null ? 'Add Builder' : 'Edit Builder'),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go('/builders');
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () => context.pop()),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildField('Full Name', _nameController),
-            const SizedBox(height: 16),
-            _buildField('Company Name', _companyController),
-            const SizedBox(height: 16),
-            _buildField('Contact Number', _contactController, keyboardType: TextInputType.phone),
-            const SizedBox(height: 16),
-            _buildField('Email', _emailController, keyboardType: TextInputType.emailAddress),
-            const SizedBox(height: 16),
-            _buildField('Address', _addressController, maxLines: 3),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _save,
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B22)),
-                child: _isSaving
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('SAVE BUILDER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        appBar: AppBar(
+          title: Text(widget.builder == null ? 'Add Builder' : 'Edit Builder'),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () => context.go('/builders')),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              _buildField('Full Name', _nameController),
+              const SizedBox(height: 16),
+              _buildField('Company Name', _companyController),
+              const SizedBox(height: 16),
+              _buildField('Contact Number', _contactController, keyboardType: TextInputType.phone),
+              const SizedBox(height: 16),
+              _buildField('Email', _emailController, keyboardType: TextInputType.emailAddress),
+              const SizedBox(height: 16),
+              _buildField('Address', _addressController, maxLines: 3),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _save,
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B22)),
+                  child: _isSaving
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('SAVE BUILDER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -123,6 +130,7 @@ class _AddBuilderViewState extends State<AddBuilderView> {
     try {
       await Provider.of<BuilderViewModel>(context, listen: false).addOrUpdateBuilder(
         id: widget.builder?.id,
+        collection: widget.builder?.sourceCollection ?? 'builders',
         name: _nameController.text.trim(),
         companyName: _companyController.text.trim(),
         contact: _contactController.text.trim(),
@@ -130,7 +138,7 @@ class _AddBuilderViewState extends State<AddBuilderView> {
         address: _addressController.text.trim(),
       );
       if (!mounted) return;
-      context.pop();
+      context.go('/builders');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {

@@ -1,15 +1,23 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../utils/meta_tag_helper.dart'; // 🚀 NAYA
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/project_viewmodel.dart';
+import '../../viewmodels/app_configuration_viewmodel.dart';
 import '../../models/project_model.dart';
+import '../../utils/role_permissions.dart';
 import '../../widgets/app_bottom_nav.dart';
+import '../../widgets/app_drawer.dart';
 
 class ProjectListView extends StatefulWidget {
   const ProjectListView({super.key});
@@ -25,6 +33,9 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   String? _selectedTypeFilter;
   String _searchQuery = '';
   String? _selectedCity;
+  bool _isSearching = false; // 🚀 NAYA
+  int? _lastSearchTriggerCount; // 🚀 NAYA
+  final FocusNode _searchFocusNode = FocusNode(); // 🚀 NAYA
 
   // --- Expanded Search Popup State ---
   String _searchCategory = 'Residential';
@@ -32,32 +43,50 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
 
   final Map<String, List<String>> _activeFilters = {};
 
-  static const List<String> _categoryTabs = ['All Projects', 'My projects', 'Hot projects'];
-
   // --- THEME COLORS ---
   final Color _primaryLight = Colors.yellow.shade300;
   final Color _primaryMid = Colors.yellow.shade400;
   final Color _primaryDark = Colors.amber.shade800;
 
-  // --- LOCAL STATE FOR RATINGS & LIKES ---
+  bool get _isSelectionMode => _selectedProjectIds.isNotEmpty;
+
+  List<String> _getCategoryTabs(AuthViewModel authVM) {
+    List<String> tabs = ['All Projects', 'My Projects'];
+    if (authVM.appRole == AppRole.admin || authVM.appRole == AppRole.superAdmin) {
+      tabs.add('Pending');
+    }
+    tabs.addAll(['Hot Projects', 'Fav Projects']);
+    return tabs;
+  }
+
+  late TabController _tabController;
+
   final Map<String, bool> _likedProjects = {};
   final Map<String, int> _projectRatings = {};
   final Set<String> _selectedProjectIds = <String>{};
 
-  bool get _isSelectionMode => _selectedProjectIds.isNotEmpty;
-
-  late TabController _tabController;
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _categoryTabs.length, vsync: this);
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final tabs = _getCategoryTabs(authVM);
+    _tabController = TabController(length: tabs.length, vsync: this);
 
     _tabController.addListener(() {
-      if (_selectedTab != _categoryTabs[_tabController.index]) {
+      final currentTabs = _getCategoryTabs(authVM);
+      if (_selectedTab != currentTabs[_tabController.index]) {
         setState(() {
-          _selectedTab = _categoryTabs[_tabController.index];
+          _selectedTab = currentTabs[_tabController.index];
           _selectedProjectIds.clear();
+        });
+      }
+    });
+
+    // 🚀 NAYA: Auto-close search when focus is lost
+    _searchFocusNode.addListener(() {
+      if (!_searchFocusNode.hasFocus && _isSearching && _searchQuery.isEmpty) {
+        setState(() {
+          _isSearching = false;
         });
       }
     });
@@ -105,8 +134,8 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete $count project${count > 1 ? 's' : ''}?'),
-        content: const Text('Selected projects and their inventory will be deleted permanently.'),
+        title: Text('Move $count item${count > 1 ? 's' : ''} to Recycle Bin?'),
+        content: const Text('Deleted projects can be restored or permanently removed from the Recycle Bin in the sidebar.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -115,7 +144,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B22)),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            child: const Text('Move to Bin', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -124,19 +153,20 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     if (shouldDelete != true) return;
 
     try {
-      await projectVM.deleteMultipleProjects(_selectedProjectIds.toList());
+      await projectVM.softDeleteMultipleProjects(_selectedProjectIds.toList());
       if (!mounted) return;
       _clearSelection();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$count project${count > 1 ? 's' : ''} deleted successfully.'),
-          backgroundColor: Colors.green,
+          content: Text('$count item${count > 1 ? 's' : ''} moved to Recycle Bin.'),
+          backgroundColor: Colors.orange.shade800,
+          action: SnackBarAction(label: 'VIEW BIN', textColor: Colors.white, onPressed: () => context.push('/recycle-bin')),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -386,14 +416,16 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   }
 
   bool _matchesSearchCategory(String type) {
+    final t = type.toLowerCase();
+    if (t == 'project') return true;
     if (_searchCategory == 'Residential') {
-      return type.toLowerCase() == 'flat' || type.toLowerCase() == 'bungalow';
+      return t == 'flat' || t == 'bungalow';
     } else if (_searchCategory == 'Commercial') {
-      return type.toLowerCase() == 'shop' ||
-          type.toLowerCase() == 'office' ||
-          type.toLowerCase() == 'showroom';
+      return t == 'shop' ||
+          t == 'office' ||
+          t == 'showroom';
     } else if (_searchCategory == 'Plot') {
-      return type.toLowerCase() == 'plot';
+      return t == 'plot' || t == 'land';
     }
     return true;
   }
@@ -402,6 +434,22 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   Widget build(BuildContext context) {
     final authVM = Provider.of<AuthViewModel>(context);
     final projectVM = Provider.of<ProjectViewModel>(context);
+    final configVM = Provider.of<AppConfigurationViewModel>(context); // 🚀 NAYA
+
+    // 🚀 NAYA: Handle Double-Tap Search Trigger
+    if (_lastSearchTriggerCount == null) {
+      _lastSearchTriggerCount = configVM.searchTriggerCount;
+    } else if (configVM.searchTriggerCount > _lastSearchTriggerCount! && configVM.activeSearchTab == 'projects') {
+      _lastSearchTriggerCount = configVM.searchTriggerCount;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _isSearching = true);
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) _searchFocusNode.requestFocus();
+          });
+        }
+      });
+    }
 
     List<Widget> activeChips = [];
     _activeFilters.forEach((key, values) {
@@ -465,204 +513,388 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
       );
     }
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    final tabs = _getCategoryTabs(authVM);
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_isSelectionMode) {
+          _clearSelection();
+        } else if (_isSearching) {
+          _searchFocusNode.unfocus();
+          setState(() {
+            _isSearching = false;
+            _searchQuery = '';
+          });
+        } else {
+          StatefulNavigationShell.of(context).goBranch(0);
+        }
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            _isSelectionMode ? Icons.close : Icons.arrow_back,
-            color: Colors.black,
-          ),
-          onPressed: () {
-            if (_isSelectionMode) {
-              _clearSelection();
-            } else {
-              context.pop();
-            }
-          },
-        ),
-        title: Text(
-          _isSelectionMode ? '${_selectedProjectIds.length} selected' : 'Inventory',
-          key: const ValueKey('titleText'),
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        actions: [
-          if (_isSelectionMode) ...[
-            IconButton(
-              icon: const Icon(Icons.select_all_rounded, color: Colors.black87),
-              onPressed: () => _selectAllFiltered(projectVM.projects),
-              tooltip: 'Select all',
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.black87),
-              onPressed: () => _deleteSelectedProjects(projectVM),
-              tooltip: 'Delete selected',
-            ),
-          ] else ...[
-            IconButton(
-              icon: const Icon(Icons.search, color: Colors.black87),
-              onPressed: _showSearchPopup,
-            ),
-            IconButton(
-              icon: const Icon(Icons.more_vert, color: Colors.black87),
-              onPressed: () {},
-            ),
-          ],
-        ],
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            color: Colors.white,
-            width: double.infinity,
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: _primaryDark,
-              indicatorWeight: 2.5,
-              dividerColor: Colors.transparent,
-              labelColor: Colors.black,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-              unselectedLabelColor: Colors.grey.shade500,
-              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-              tabs: _categoryTabs.map((tab) => Tab(text: tab)).toList(),
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          if (activeChips.isNotEmpty)
-            Container(
-              width: double.infinity,
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(children: activeChips),
-              ),
-            ),
-
-          if (_selectedCity != null || _selectedConditionFilter != null || _selectedTypeFilter != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: SizedBox(
-                width: double.infinity,
-                child: Text(
-                  _getDynamicListTitle(),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.black87),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: _isSelectionMode 
+            ? IconButton(
+                icon: const Icon(Icons.close, color: Colors.black),
+                onPressed: _clearSelection,
+              )
+            : Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu, color: Colors.black),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               ),
-            ),
-
-          Expanded(
-            child: projectVM.isLoading
-                ? Center(child: CircularProgressIndicator(color: _primaryDark))
-                : TabBarView(
-              controller: _tabController,
-              children: _categoryTabs.map((currentTabName) {
-                final displayProjects = projectVM.projects.where((project) {
-                  if (currentTabName == 'My projects') {
-                    if (project.createdByUid != authVM.userUid) return false;
-                  } else if (currentTabName == 'Hot projects') {
-                    int rating = _projectRatings[project.id] ?? 0;
-                    bool liked = _likedProjects[project.id] ?? false;
-                    if (!project.isHot && rating < 4 && !liked) return false;
-                  }
-
-                  if (_searchQuery.isNotEmpty) {
-                    if (!project.projectName.toLowerCase().contains(_searchQuery.toLowerCase())) return false;
-                  }
-                  if (!_matchesSearchCategory(project.propertyType)) return false;
-                  if (_selectedTypeFilter != null && project.propertyType != _selectedTypeFilter) return false;
-                  if (!_matchesSelectedCondition(project)) return false;
-
-                  if (_selectedCity != null) {
-                    String rawLoc = project.propertyDetails['location']?.toString() ?? '';
-                    String city = rawLoc.split(',').last.trim();
-                    if (city.toLowerCase() != _selectedCity!.toLowerCase()) return false;
-                  }
-
-                  return true;
-                }).toList();
-
-                displayProjects.sort((a, b) {
-                  if (a.isHot && !b.isHot) return -1;
-                  if (!a.isHot && b.isHot) return 1;
-
-                  int aRating = _projectRatings[a.id] ?? 0;
-                  int bRating = _projectRatings[b.id] ?? 0;
-                  if (aRating != bRating) return bRating.compareTo(aRating);
-
-                  bool aLiked = _likedProjects[a.id] ?? false;
-                  bool bLiked = _likedProjects[b.id] ?? false;
-                  if (aLiked && !bLiked) return -1;
-                  if (!aLiked && bLiked) return 1;
-
-                  return 0;
-                });
-
-                if (displayProjects.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.folder_open_rounded, size: 48, color: Colors.grey.shade300),
-                        const SizedBox(height: 16),
-                        Text('No $currentTabName found', style: TextStyle(color: Colors.grey.shade500)),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: EdgeInsets.zero,
-                  itemCount: displayProjects.length,
-                  itemBuilder: (context, index) {
-                    final project = displayProjects[index];
-                    return _buildProjectCard(project);
+          title: _isSearching
+              ? TextField(
+                  focusNode: _searchFocusNode,
+                  autofocus: true,
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                  decoration: const InputDecoration(
+                    hintText: 'Search projects...',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                  style: const TextStyle(color: Colors.black, fontSize: 16),
+                )
+              : Text(
+                  _isSelectionMode ? '${_selectedProjectIds.length} selected' : 'Inventory',
+                  key: const ValueKey('titleText'),
+                  style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+          actions: [
+            if (_isSelectionMode) ...[
+              IconButton(
+                icon: const Icon(Icons.select_all_rounded, color: Colors.black87),
+                onPressed: () => _selectAllFiltered(projectVM.projects),
+                tooltip: 'Select all',
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.black87),
+                onPressed: () => _deleteSelectedProjects(projectVM),
+                tooltip: 'Delete selected',
+              ),
+            ] else ...[
+              if (_isSearching)
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.black),
+                  onPressed: () {
+                    setState(() {
+                      _isSearching = false;
+                      _searchQuery = '';
+                    });
                   },
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton:
-      _isSelectionMode || !authVM.permissions.canAddProjects
-          ? null
-          : Padding(
-        padding: const EdgeInsets.only(bottom: 20.0),
-        child: FloatingActionButton(
-          onPressed: () => context.push('/add-project'),
-          backgroundColor: const Color(0xFFFDE047),
-          child: const Icon(Icons.add, color: Colors.black87),
+                )
+              else ...[
+                IconButton(
+                  icon: const Icon(Icons.search, color: Colors.black87),
+                  onPressed: () => setState(() => _isSearching = true),
+                  tooltip: 'Search',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.tune_rounded, color: Colors.black87),
+                  onPressed: _showSearchPopup,
+                  tooltip: 'Filter',
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.black87),
+                  onSelected: (value) {
+                    if (value == 'filter') {
+                      _showSearchPopup();
+                    } else if (value == 'profile') {
+                      context.push('/profile');
+                    } else if (value == 'select') {
+                      setState(() {
+                        // Enter selection mode by adding first visible project
+                        if (projectVM.projects.isNotEmpty) {
+                          _selectedProjectIds.add(projectVM.projects.firstWhere((p) => !p.isDeleted).id);
+                        }
+                      });
+                    }
+                  },
+                  itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                    const PopupMenuItem<String>(
+                      value: 'select',
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_box_outlined, color: Colors.black54),
+                          SizedBox(width: 12),
+                          Text('Select Projects'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'filter',
+                      child: Row(
+                        children: [
+                          Icon(Icons.tune_rounded, color: Colors.black54),
+                          SizedBox(width: 12),
+                          Text('Filter Projects'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'profile',
+                      child: Row(
+                        children: [
+                          Icon(Icons.account_circle_outlined, color: Colors.black54),
+                          SizedBox(width: 12),
+                          Text('Profile / Score'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ],
         ),
-      ),
-      bottomNavigationBar: AppBottomNav(
-        currentTab: 'projects',
-        backgroundColor: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
-        activeGradientColors: [_primaryLight, _primaryMid],
-        activeIconColor: Colors.black87,
-        activeLabelColor: _primaryDark,
-        inactiveIconColor: Colors.grey.shade600,
-        projectsLabel: 'Projects',
-        cpLabel: 'Network',
+        drawer: const AppDrawer(),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              color: Colors.white,
+              width: double.infinity,
+              child: TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                indicatorColor: _primaryDark,
+                indicatorWeight: 2.5,
+                dividerColor: Colors.transparent,
+                labelColor: Colors.black,
+                labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                unselectedLabelColor: Colors.grey.shade500,
+                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+                tabs: tabs.map((tab) => Tab(text: tab)).toList(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (activeChips.isNotEmpty)
+              Container(
+                width: double.infinity,
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(children: activeChips),
+                ),
+              ),
+            if (_selectedCity != null || _selectedConditionFilter != null || _selectedTypeFilter != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    _getDynamicListTitle(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.black87),
+                  ),
+                ),
+              ),
+            Expanded(
+              child: projectVM.isLoading
+                  ? Center(child: CircularProgressIndicator(color: _primaryDark))
+                  : TabBarView(
+                      controller: _tabController,
+                      children: tabs.map((currentTabName) {
+                        final displayProjects = projectVM.projects.where((project) {
+                          final isApproved = project.isApproved;
+                          final creatorUid = project.createdByUid;
+
+                          if (currentTabName == 'All Projects') {
+                            if (!isApproved) return false;
+                          } else if (currentTabName == 'Pending') {
+                            if (isApproved) return false;
+                          } else if (currentTabName == 'My Projects') {
+                            if (creatorUid != authVM.userUid) return false;
+                          } else if (currentTabName == 'Hot Projects') {
+                            int rating = _projectRatings[project.id] ?? 0;
+                            bool liked = _likedProjects[project.id] ?? false;
+                            if (!project.isHot && rating < 4 && !liked) return false;
+                            if (!isApproved) return false;
+                          } else if (currentTabName == 'Fav Projects') {
+                            bool liked = _likedProjects[project.id] ?? false;
+                            if (!liked) return false;
+                          }
+
+                          if (_searchQuery.isNotEmpty) {
+                            if (!project.projectName.toLowerCase().contains(_searchQuery.toLowerCase())) return false;
+                          }
+
+                          // 🚀 NAYA: "My Projects", "Pending", and "Fav Projects" tabs should ignore category/type/city filters
+                          // so users can always find their own work, items needing approval, or favorites.
+                          final bool isBypassTab = currentTabName == 'My Projects' || currentTabName == 'Pending' || currentTabName == 'Fav Projects';
+                          
+                          if (!isBypassTab) {
+                            if (!_matchesSearchCategory(project.propertyType)) return false;
+                            if (_selectedTypeFilter != null && project.propertyType != _selectedTypeFilter) return false;
+                            if (!_matchesSelectedCondition(project)) return false;
+
+                            if (_selectedCity != null) {
+                              String rawLoc = project.propertyDetails['location']?.toString() ?? '';
+                              String city = rawLoc.split(',').last.trim();
+                              if (city.toLowerCase() != _selectedCity!.toLowerCase()) return false;
+                            }
+                          }
+
+                          return true;
+                        }).toList();
+
+                        displayProjects.sort((a, b) {
+                          // 1. Hot projects always at the top
+                          if (a.isHot && !b.isHot) return -1;
+                          if (!a.isHot && b.isHot) return 1;
+
+                          // 2. Newest projects first (recently added)
+                          final t1 = a.rawData['timestamp'];
+                          final t2 = b.rawData['timestamp'];
+                          if (t1 != null && t2 != null && t1 is Timestamp && t2 is Timestamp) {
+                            int timeCompare = t2.compareTo(t1); // Descending (newest first)
+                            if (timeCompare != 0) return timeCompare;
+                          }
+
+                          // 3. Fallback: Rating
+                          int aRating = _projectRatings[a.id] ?? 0;
+                          int bRating = _projectRatings[b.id] ?? 0;
+                          if (aRating != bRating) return bRating.compareTo(aRating);
+
+                          // 4. Fallback: Liked status
+                          bool aLiked = _likedProjects[a.id] ?? false;
+                          bool bLiked = _likedProjects[b.id] ?? false;
+                          if (aLiked && !bLiked) return -1;
+                          if (!aLiked && bLiked) return 1;
+
+                          return 0;
+                        });
+
+                        if (displayProjects.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.folder_open_rounded, size: 48, color: Colors.grey.shade300),
+                                const SizedBox(height: 16),
+                                Text('No $currentTabName found', style: TextStyle(color: Colors.grey.shade500)),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
+                          padding: EdgeInsets.zero,
+                          itemCount: displayProjects.length,
+                          itemBuilder: (context, index) {
+                            final project = displayProjects[index];
+                            return _buildProjectCard(project);
+                          },
+                        );
+                      }).toList(),
+                    ),
+            ),
+          ],
+        ),
+        floatingActionButton: _isSelectionMode || !authVM.permissions.canAddProjects
+            ? null
+            : Padding(
+                padding: const EdgeInsets.only(bottom: 20.0),
+                child: FloatingActionButton(
+                  heroTag: 'project_list_fab',
+                  onPressed: () => context.push('/add-project'),
+                  backgroundColor: const Color(0xFFFDE047),
+                  child: const Icon(Icons.add, color: Colors.black87),
+                ),
+              ),
       ),
     );
   }
 
+  // 🚀 NAYA: Helper function to format price
+  String _formatPrice(String? priceStr) {
+    if (priceStr == null || priceStr.trim().isEmpty) return 'On Request';
+    
+    // Check if it's a range (e.g. 400000 - 4500000)
+    if (priceStr.contains('-')) {
+      final parts = priceStr.split('-');
+      if (parts.length == 2) {
+        final start = _formatSinglePrice(parts[0].trim());
+        final end = _formatSinglePrice(parts[1].trim());
+        return '$start - $end';
+      }
+    }
+    
+    return _formatSinglePrice(priceStr.trim());
+  }
+
+  String _formatSinglePrice(String valStr) {
+    // Remove ₹ if present
+    valStr = valStr.replaceAll('₹', '').trim();
+    
+    double? val = double.tryParse(valStr);
+    if (val == null) return valStr; // return original if parsing fails
+
+    if (val >= 10000000) {
+      String res = (val / 10000000).toStringAsFixed(2);
+      if (res.endsWith('.00')) res = res.substring(0, res.length - 3);
+      else if (res.endsWith('0')) res = res.substring(0, res.length - 1);
+      return '$res Cr';
+    } else if (val >= 100000) {
+      String res = (val / 100000).toStringAsFixed(2);
+      if (res.endsWith('.00')) res = res.substring(0, res.length - 3);
+      else if (res.endsWith('0')) res = res.substring(0, res.length - 1);
+      return '$res L';
+    } else if (val >= 1000) {
+      String res = (val / 1000).toStringAsFixed(2);
+      if (res.endsWith('.00')) res = res.substring(0, res.length - 3);
+      else if (res.endsWith('0')) res = res.substring(0, res.length - 1);
+      return '$res K';
+    } else {
+      // Remove trailing .0
+      String res = val.toString();
+      if (res.endsWith('.0')) res = res.substring(0, res.length - 2);
+      return res;
+    }
+  }
+
   Widget _buildProjectCard(ProjectModel project) {
+    final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final bool isAdmin = authVM.appRole == AppRole.admin || authVM.appRole == AppRole.superAdmin;
+    final bool showStatusControls = isAdmin && !project.isApproved;
     final details = project.propertyDetails;
-    List<String> imageUrls = details['images'] != null ? List<String>.from(details['images']) : [];
-    final location = details['location']?.toString() ?? 'Location N/A';
-    final price = details['startingPrice']?.toString() ?? 'On Request';
+    List<String> imageUrls = (details['images'] is Iterable) ? List<String>.from(details['images']) : [];
+    String getDisplayLocation() {
+      final loc = (details['googleLocation'] ?? details['areaName'] ?? details['location'] ?? details['address'] ??
+                   project.rawData['googleLocation'] ?? project.rawData['areaName'] ?? project.rawData['location'] ?? project.rawData['address'] ?? '')
+                  .toString().trim();
+      return loc.isNotEmpty && loc != 'null' ? loc : 'Location N/A';
+    }
+    final location = getDisplayLocation();
+    
+    String rawPrice = details['startingPrice']?.toString() ?? '';
+    if (rawPrice.isEmpty) {
+      if (project.propertyType == 'Land') {
+        if (details['minCostLand'] != null) {
+          rawPrice = '${details['minCostLand']}${details['maxCostLand'] != null ? ' - ${details['maxCostLand']}' : ''}';
+        }
+      } else {
+        if (details['minCost'] != null) {
+          rawPrice = '${details['minCost']}${details['maxCost'] != null ? ' - ${details['maxCost']}' : ''}';
+        }
+      }
+    }
+    
+    String formattedPrice = _formatPrice(rawPrice);
+
     final condition = details['condition']?.toString() ?? 'New';
     bool isLiked = _likedProjects[project.id] ?? false;
     int currentRating = _projectRatings[project.id] ?? 0;
+    final String currentApproval = (project.rawData['approvalStatus']?.toString() ?? (project.isApproved ? 'Approved' : 'Pending')).trim();
 
     String bhk = details['bhk']?.toString() ?? '';
     String area = details['carpetArea']?.toString() ?? details['totalArea']?.toString() ?? details['plotArea']?.toString() ?? '';
@@ -685,7 +917,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
         child: InkWell(
           onTap: () {
             if (_isSelectionMode) _toggleProjectSelection(project.id);
-            else context.push('/project-detail', extra: project);
+            else context.push('/project-detail/${project.id}', extra: project);
           },
           onLongPress: () => _toggleProjectSelection(project.id),
           borderRadius: BorderRadius.circular(16),
@@ -703,10 +935,21 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                       decoration: BoxDecoration(
                         color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(12),
+                        border: _selectedProjectIds.contains(project.id) ? Border.all(color: _primaryDark, width: 3) : null,
                         image: imageUrls.isNotEmpty ? DecorationImage(image: NetworkImage(imageUrls.first), fit: BoxFit.cover) : null,
                       ),
                       child: imageUrls.isEmpty ? Center(child: Icon(typeIcon, color: Colors.grey.shade400, size: 40)) : null,
                     ),
+                    if (_selectedProjectIds.contains(project.id))
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(color: _primaryDark, shape: BoxShape.circle),
+                          child: const Icon(Icons.check, color: Colors.white, size: 16),
+                        ),
+                      ),
                     Positioned(
                       top: 6,
                       left: 6,
@@ -750,7 +993,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                       Row(
                         children: [
                           Expanded(
-                            child: Text(price, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black87)),
+                            child: Text(formattedPrice == 'On Request' ? formattedPrice : '₹ $formattedPrice', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black87)),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -806,13 +1049,46 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                       ),
                       const SizedBox(height: 16),
 
-                      Row(
-                        children: [
-                          Expanded(child: _mockupButton('Get Quote', () {})),
-                          const SizedBox(width: 10),
-                          Expanded(child: _mockupButton('Get Brochure', () => context.push('/project-detail', extra: project))),
-                        ],
-                      ),
+                      if (showStatusControls)
+                        Row(
+                          children: [
+                            _statusActionButton(
+                              label: 'Approved',
+                              color: Colors.green.shade700,
+                              isCurrentStatus: project.isApproved || currentApproval.toLowerCase() == 'approved',
+                              onTap: () => _updateStatus(context, projectVM, authVM, project.id, 'Approved'),
+                            ),
+                            const SizedBox(width: 4),
+                            _statusActionButton(
+                              label: 'Reject',
+                              color: Colors.red.shade700,
+                              isCurrentStatus: currentApproval.toLowerCase() == 'reject' || currentApproval.toLowerCase() == 'rejected',
+                              onTap: () => _updateStatus(context, projectVM, authVM, project.id, 'Reject'),
+                            ),
+                            const SizedBox(width: 4),
+                            _statusActionButton(
+                              label: 'Process',
+                              color: Colors.blue.shade700,
+                              isCurrentStatus: currentApproval.toLowerCase() == 'process',
+                              onTap: () => _updateStatus(context, projectVM, authVM, project.id, 'Process'),
+                            ),
+                            const SizedBox(width: 4),
+                            _statusActionButton(
+                              label: 'Hold',
+                              color: Colors.amber.shade800,
+                              isCurrentStatus: currentApproval.toLowerCase() == 'hold',
+                              onTap: () => _updateStatus(context, projectVM, authVM, project.id, 'Hold'),
+                            ),
+                          ],
+                        )
+                      else
+                        Row(
+                          children: [
+                            _actionButton('Get Quote', () => _handleGetQuote(context, project)),
+                            const SizedBox(width: 10),
+                            _actionButton('Get Brochure', () => _handleGetBrochure(context, project)),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -824,19 +1100,204 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     );
   }
 
-  Widget _mockupButton(String label, VoidCallback onTap) {
-    return SizedBox(
-      height: 32,
-      child: OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Color(0xFFFF6B22), width: 1.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          padding: EdgeInsets.zero,
-        ),
-        child: Text(label, style: const TextStyle(color: Color(0xFFFF6B22), fontSize: 12, fontWeight: FontWeight.bold)),
+  Widget _statusActionButton({
+    required String label,
+    required Color color,
+    required bool isCurrentStatus,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: SizedBox(
+        height: 28,
+        child: isCurrentStatus
+            ? ElevatedButton(
+                onPressed: onTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  elevation: 0,
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w800),
+                ),
+              )
+            : OutlinedButton(
+                onPressed: onTap,
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: color, width: 1.2),
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.w800),
+                ),
+              ),
       ),
     );
+  }
+
+  Future<void> _updateStatus(
+    BuildContext context,
+    ProjectViewModel projectVM,
+    AuthViewModel authVM,
+    String projectId,
+    String status,
+  ) async {
+    try {
+      await projectVM.updateProjectApprovalStatus(
+        projectId,
+        status,
+        actorMetadata: authVM.actorMetadata,
+      );
+      if (!context.mounted) return;
+      final String msg = status == 'Approved'
+          ? 'Project Approved! Moved to All Projects.'
+          : 'Project marked as $status (Pending).';
+      final Color color = status == 'Approved'
+          ? Colors.green.shade700
+          : (status == 'Reject' ? Colors.red.shade700 : Colors.amber.shade800);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: color,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update status: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Widget _actionButton(String label, VoidCallback onTap) {
+    return Expanded(
+      child: SizedBox(
+        height: 32,
+        child: OutlinedButton(
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Color(0xFFE5B800), width: 1.5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: const TextStyle(color: Color(0xFFE5B800), fontSize: 11, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _iconActionButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required String tooltip,
+  }) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: Tooltip(
+        message: tooltip,
+        child: OutlinedButton(
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: color, width: 1.5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: EdgeInsets.zero,
+          ),
+          child: Icon(icon, color: color, size: 16),
+        ),
+      ),
+    );
+  }
+
+  void _handleShareProject(BuildContext context, ProjectModel project) {
+    final details = project.propertyDetails;
+    final String loc = (details['googleLocation'] ?? details['areaName'] ?? details['location'] ?? details['address'] ?? project.rawData['googleLocation'] ?? '').toString().trim();
+    final String location = loc.isNotEmpty && loc != 'null' ? loc : 'Location N/A';
+    
+    String rawPrice = details['startingPrice']?.toString() ?? '';
+    if (rawPrice.isEmpty) {
+      if (project.propertyType == 'Land') {
+        if (details['minCostLand'] != null) rawPrice = '${details['minCostLand']}${details['maxCostLand'] != null ? ' - ${details['maxCostLand']}' : ''}';
+      } else {
+        if (details['minCost'] != null) rawPrice = '${details['minCost']}${details['maxCost'] != null ? ' - ${details['maxCost']}' : ''}';
+      }
+    }
+    final String formattedPrice = _formatPrice(rawPrice);
+    final String priceText = formattedPrice == 'On Request' ? formattedPrice : '₹ $formattedPrice';
+
+    final String baseUrl = Uri.base.origin;
+    final String encodedName = Uri.encodeComponent(project.projectName);
+    final String shareLink = "$baseUrl/#/share/project/$encodedName";
+
+    // 🚀 NAYA: Rich Share Message with Property+ at top, Building Name, Location, Price
+    final String message = "Property+\n\n"
+        "🏢 Building: ${project.projectName}\n"
+        "📍 Location: $location\n"
+        "💰 Starting Price: $priceText\n\n"
+        "🔗 View Property Details & Photos:\n$shareLink";
+
+    List<String> imageUrls = (details['images'] is Iterable) ? List<String>.from(details['images']) : [];
+    final String? coverImage = imageUrls.isNotEmpty ? imageUrls.first : null;
+
+    // Dynamically update OpenGraph Meta Tags on Web for chat card previews
+    MetaTagHelper.updatePropertyMetaTags(
+      title: '${project.projectName} - $location',
+      description: 'Location: $location | Price: $priceText',
+      imageUrl: coverImage,
+    );
+
+    Clipboard.setData(ClipboardData(text: shareLink)).then((_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Property link copied to clipboard!'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.blue,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
+
+    // Triggers OS native app share picker (WhatsApp, Messages, Instagram, Mail, etc.)
+    Share.share(message, subject: 'Property+ | ${project.projectName}');
+  }
+
+  Future<void> _handleGetBrochure(BuildContext context, ProjectModel project) async {
+    final details = project.propertyDetails;
+    final String? brochureUrl = details['brochurePdf']?.toString() ?? details['brochure']?.toString();
+    if (brochureUrl != null && brochureUrl.trim().isNotEmpty && brochureUrl.startsWith('http')) {
+      final Uri url = Uri.parse(brochureUrl.trim());
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url);
+        return;
+      }
+    }
+    if (context.mounted) {
+      context.push('/project-detail/${project.id}', extra: project);
+    }
+  }
+
+  void _handleGetQuote(BuildContext context, ProjectModel project) {
+    context.push('/project-detail/${project.id}', extra: project);
   }
 
   bool _matchesSelectedCondition(ProjectModel project) {

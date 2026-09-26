@@ -55,69 +55,76 @@ class _CustomFormViewState extends State<CustomFormView> {
 
     final fields = fieldsToDisplay..sort((a, b) => a.order.compareTo(b.order));
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: Text(form.label),
-        leading: IconButton(
-          tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go('/dashboard');
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          title: Text(form.label),
+          leading: IconButton(
+            tooltip: 'Back',
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go('/dashboard'),
+          ),
+          actions: [
+            if (authVM.canConfigureForms)
+              IconButton(
+                tooltip: _isEditMode ? 'View Form' : 'Customize Form',
+                icon: Icon(_isEditMode ? Icons.remove_red_eye_outlined : Icons.edit_note_rounded),
+                color: _isEditMode ? const Color(0xFFFF6B22) : Colors.black,
+                onPressed: () => setState(() => _isEditMode = !_isEditMode),
+              ),
+            const SizedBox(width: 8),
+          ],
         ),
-        actions: [
-          if (authVM.canConfigureForms)
-            IconButton(
-              tooltip: _isEditMode ? 'View Form' : 'Customize Form',
-              icon: Icon(_isEditMode ? Icons.remove_red_eye_outlined : Icons.edit_note_rounded),
-              color: _isEditMode ? const Color(0xFFFF6B22) : Colors.black,
-              onPressed: () => setState(() => _isEditMode = !_isEditMode),
-            ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: fields.isEmpty
-          ? const Center(child: Text('This form has no fields yet.'))
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (_isEditMode)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 16),
-                    child: Text(
-                      'Admin Mode: Tap eye icon to hide/show fields for users.',
-                      style: TextStyle(color: Color(0xFFFF6B22), fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ...fields.map((field) => _buildField(field, form, configVM)),
-                const SizedBox(height: 8),
-                if (!_isEditMode)
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF6B22),
-                      minimumSize: const Size.fromHeight(48),
-                    ),
-                    onPressed: _isSaving ? null : () => _submit(form, fields),
-                    child: _isSaving
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text('Submit'),
-                  ),
-                if (_isEditMode)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 24),
-                    child: OutlinedButton.icon(
-                      onPressed: () => _showAddFieldDialog(form, configVM),
-                      icon: const Icon(Icons.add, color: Color(0xFFFF6B22)),
-                      label: const Text('Add New Field', style: TextStyle(color: Color(0xFFFF6B22))),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFFFF6B22)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        body: fields.isEmpty
+            ? const Center(child: Text('This form has no fields yet.'))
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  if (_isEditMode)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        'Admin Mode: Tap eye icon to hide/show fields for users.',
+                        style: TextStyle(color: Color(0xFFFF6B22), fontWeight: FontWeight.bold),
                       ),
                     ),
-                  ),
-              ],
-            ),
+                  ...fields.map((field) => _buildField(field, form, configVM)),
+                  const SizedBox(height: 8),
+                  if (!_isEditMode)
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF6B22),
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      onPressed: _isSaving ? null : () => _submit(form, fields),
+                      child: _isSaving
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text('Submit'),
+                    ),
+                  if (_isEditMode)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 24),
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showAddFieldDialog(form, configVM),
+                        icon: const Icon(Icons.add, color: Color(0xFFFF6B22)),
+                        label: const Text('Add New Field', style: TextStyle(color: Color(0xFFFF6B22))),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFFF6B22)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+      ),
     );
   }
 
@@ -340,7 +347,7 @@ class _CustomFormViewState extends State<CustomFormView> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Form submitted successfully.')),
       );
-      context.pop();
+      context.go('/dashboard');
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

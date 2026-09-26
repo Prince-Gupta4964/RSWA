@@ -1,4 +1,4 @@
-enum AppRole { superAdmin, admin, officeStaff, builder, cp, unknown }
+enum AppRole { superAdmin, admin, officeStaff, builder, cp, viewer, unknown }
 
 String appRoleKey(AppRole role) {
   switch (role) {
@@ -12,6 +12,8 @@ String appRoleKey(AppRole role) {
       return 'builder';
     case AppRole.cp:
       return 'cp';
+    case AppRole.viewer:
+      return 'viewer';
     case AppRole.unknown:
       return 'unknown';
   }
@@ -30,6 +32,9 @@ AppRole parseAppRole(String? rawRole) {
     case 'cp':
     case 'channel partner':
       return AppRole.cp;
+    case 'viewer':
+    case 'client':
+      return AppRole.viewer;
     default:
       return AppRole.unknown;
   }
@@ -47,6 +52,8 @@ String appRoleLabel(AppRole role) {
       return 'Builder';
     case AppRole.cp:
       return 'CP';
+    case AppRole.viewer:
+      return 'Viewer';
     case AppRole.unknown:
       return 'Unknown';
   }
@@ -103,6 +110,7 @@ class AppPermissions {
             'cp',
             'monitoring',
             'admin',
+            'map',
           ],
         );
       case AppRole.admin:
@@ -124,6 +132,7 @@ class AppPermissions {
             'cp',
             'monitoring',
             'admin',
+            'map',
           ],
         );
       case AppRole.officeStaff:
@@ -138,7 +147,7 @@ class AppPermissions {
           canSeeMonitoring: true,
           canAddProjects: true,
           canAddLeads: true,
-          dashboardTabs: ['dashboard', 'projects', 'leads', 'cp', 'monitoring'],
+          dashboardTabs: ['dashboard', 'projects', 'leads', 'cp', 'monitoring', 'map'],
         );
       case AppRole.builder:
       case AppRole.cp:
@@ -153,7 +162,21 @@ class AppPermissions {
           canSeeMonitoring: false,
           canAddProjects: true,
           canAddLeads: true,
-          dashboardTabs: ['dashboard', 'projects', 'leads'],
+          dashboardTabs: ['dashboard', 'projects', 'leads', 'cp', 'map'],
+        );
+      case AppRole.viewer:
+        return const AppPermissions(
+          canManageUsers: false,
+          canManageRoles: false,
+          canConfigureForms: false,
+          canConfigureTabs: false,
+          canCreateCustomFilters: false,
+          canSeeAllProjects: true,
+          canSeeAllLeads: false,
+          canSeeMonitoring: false,
+          canAddProjects: false,
+          canAddLeads: false,
+          dashboardTabs: ['projects'],
         );
       case AppRole.unknown:
         return const AppPermissions(

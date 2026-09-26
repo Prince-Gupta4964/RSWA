@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web/web.dart' as web;
 
 class StorageHelper {
   static const String _sessionKey = 'rswa_session_user_id';
@@ -42,9 +43,11 @@ class StorageHelper {
   /// Utility for hard-refreshing the web app
   static void reloadApp() {
     if (kIsWeb) {
-      // Since dart:html is discouraged, we can use a native JS call if needed,
-      // but usually GoRouter handles navigation. If a full reload is required:
-      // WidgetsBinding.instance.addPostFrameCallback((_) => window.location.reload());
+      try {
+        web.window.location.reload();
+      } catch (e) {
+        debugPrint('STORAGE ERROR (Reload): $e');
+      }
     }
   }
 }

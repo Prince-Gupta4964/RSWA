@@ -6,6 +6,14 @@ class LeadModel {
   final List<String> favUids; // 🚀 NAYA: To track favorites
   final Map<String, dynamic> rawData; 
 
+  String get fullName {
+    final String firstName = name.trim();
+    final String surname = (rawData['surname'] ?? '').toString().trim();
+    return surname.isNotEmpty && !firstName.toLowerCase().contains(surname.toLowerCase())
+        ? '$firstName $surname'
+        : firstName;
+  }
+
   LeadModel({
     required this.id,
     required this.name,
@@ -22,8 +30,8 @@ class LeadModel {
       name: data['name'] ?? data['fullName'] ?? 'Unknown',
       // Ab whatsapp ya contact2 me se koi ek yahan dikhega
       contact: data['whatsapp'] ?? data['contact1'] ?? data['contact2'] ?? 'No Contact',
-      status: data['status'] ?? 'Cold',
-      favUids: List<String>.from(data['favUids'] ?? []),
+      status: (data['status'] ?? 'Cold').toString(),
+      favUids: (data['favUids'] is Iterable) ? List<String>.from(data['favUids']) : [],
       rawData: data, // <-- Saare fields automatically yahan aa jayenge
     );
   }

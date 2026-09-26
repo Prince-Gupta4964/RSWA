@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/app_configuration_models.dart';
@@ -7,6 +8,7 @@ import '../../utils/role_permissions.dart';
 import '../../viewmodels/app_configuration_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/user_management_viewmodel.dart';
+import '../../widgets/app_drawer.dart';
 
 class AdminConsoleView extends StatelessWidget {
   const AdminConsoleView({super.key});
@@ -29,35 +31,49 @@ class AdminConsoleView extends StatelessWidget {
       if (isSuperAdmin) const Tab(text: 'Tabs'),
     ];
 
-    return DefaultTabController(
-      length: tabs.length,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          scrolledUnderElevation: 0,
-          elevation: 0,
-          title: const Text(
-            'Admin Console',
-            style: TextStyle(fontWeight: FontWeight.w700),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        StatefulNavigationShell.of(context).goBranch(0);
+      },
+      child: DefaultTabController(
+        length: tabs.length,
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            scrolledUnderElevation: 0,
+            elevation: 0,
+            leading: Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.menu, color: Colors.black),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+            ),
+            title: const Text(
+              'Admin Console',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            bottom: TabBar(
+              isScrollable: true,
+              labelColor: const Color(0xFFFF6B22),
+              indicatorColor: const Color(0xFFFF6B22),
+              dividerColor: const Color(0xFFE5E7EB),
+              tabs: tabs,
+            ),
           ),
-          bottom: TabBar(
-            isScrollable: true,
-            labelColor: const Color(0xFFFF6B22),
-            indicatorColor: const Color(0xFFFF6B22),
-            dividerColor: const Color(0xFFE5E7EB),
-            tabs: tabs,
+          drawer: const AppDrawer(),
+          body: TabBarView(
+            children: [
+              const _UsersTab(),
+              if (isSuperAdmin) const _CpAccessTab(),
+              if (isSuperAdmin) const _RolesTab(),
+              if (isSuperAdmin) const _LeadFormTab(),
+              if (isSuperAdmin) const _CustomFormsTab(),
+              if (isSuperAdmin) const _DashboardTabsTab(),
+            ],
           ),
-        ),
-        body: TabBarView(
-          children: [
-            const _UsersTab(),
-            if (isSuperAdmin) const _CpAccessTab(),
-            if (isSuperAdmin) const _RolesTab(),
-            if (isSuperAdmin) const _LeadFormTab(),
-            if (isSuperAdmin) const _CustomFormsTab(),
-            if (isSuperAdmin) const _DashboardTabsTab(),
-          ],
         ),
       ),
     );

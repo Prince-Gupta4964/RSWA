@@ -15,90 +15,97 @@ class BuilderDetailView extends StatelessWidget {
     final projectVM = Provider.of<ProjectViewModel>(context);
     final linkedProjects = projectVM.projects.where((p) => p.builderIds.contains(builder.id)).toList();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: Text(builder.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () => context.pop()),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined, color: Color(0xFFFF6B22)),
-            onPressed: () => context.push('/add-builder', extra: builder),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go('/builders');
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          title: Text(builder.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () => context.go('/builders')),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, color: Color(0xFFFF6B22)),
+              onPressed: () => context.push('/add-builder', extra: builder),
+            ),
+          ],
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10)],
+                ),
+                child: Column(
+                  children: [
+                    _infoSection('Builder Name', builder.name),
+                    const Divider(height: 24),
+                    _infoSection('Company', builder.companyName),
+                    const Divider(height: 24),
+                    _infoSection('Contact', builder.contact),
+                    const Divider(height: 24),
+                    _infoSection('Email', builder.email),
+                    const Divider(height: 24),
+                    _infoSection('Address', builder.address),
+                  ],
+                ),
               ),
-              child: Column(
+              const SizedBox(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _infoSection('Builder Name', builder.name),
-                  const Divider(height: 24),
-                  _infoSection('Company', builder.companyName),
-                  const Divider(height: 24),
-                  _infoSection('Contact', builder.contact),
-                  const Divider(height: 24),
-                  _infoSection('Email', builder.email),
-                  const Divider(height: 24),
-                  _infoSection('Address', builder.address),
+                  const Text('Associated Projects', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
+                  ElevatedButton.icon(
+                    onPressed: () => _showLinkProjectDialog(context, builder, projectVM),
+                    icon: const Icon(Icons.add_link, size: 18, color: Colors.white),
+                    label: const Text('Link', style: TextStyle(color: Colors.white, fontSize: 12)),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B22), elevation: 0),
+                  ),
                 ],
               ),
-            ),
-            const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Associated Projects', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
-                ElevatedButton.icon(
-                  onPressed: () => _showLinkProjectDialog(context, builder, projectVM),
-                  icon: const Icon(Icons.add_link, size: 18, color: Colors.white),
-                  label: const Text('Link', style: TextStyle(color: Colors.white, fontSize: 12)),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B22), elevation: 0),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (linkedProjects.isEmpty)
-              const Text('No projects linked to this builder.', style: TextStyle(color: Colors.grey))
-            else
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: linkedProjects.length,
-                itemBuilder: (context, index) {
-                  final project = linkedProjects[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: Color(0xFFFFF1EA),
-                        child: Icon(Icons.business_rounded, color: Color(0xFFFF6B22), size: 18),
+              const SizedBox(height: 12),
+              if (linkedProjects.isEmpty)
+                const Text('No projects linked to this builder.', style: TextStyle(color: Colors.grey))
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: linkedProjects.length,
+                  itemBuilder: (context, index) {
+                    final project = linkedProjects[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade200),
                       ),
-                      title: Text(project.projectName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                      subtitle: Text(project.propertyType, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
-                      onTap: () => context.push('/project-detail', extra: project),
-                    ),
-                  );
-                },
-              ),
-          ],
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: Color(0xFFFFF1EA),
+                          child: Icon(Icons.business_rounded, color: Color(0xFFFF6B22), size: 18),
+                        ),
+                        title: Text(project.projectName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        subtitle: Text(project.propertyType, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+                        onTap: () => context.push('/project-detail', extra: project),
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );

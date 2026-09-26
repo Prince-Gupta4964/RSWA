@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import '../models/app_configuration_models.dart';
@@ -12,12 +13,58 @@ class AppConfigurationViewModel extends ChangeNotifier {
   List<RoleDefinition> _customRoles = const [];
   List<CustomFormConfig> _customForms = const [];
   List<String> _leadStatuses = const ['Paid', 'Book', 'Hot', 'Warm', 'Cold', 'Think', 'Hold', 'Out'];
+  Map<String, Map<String, List<String>>> _fieldOptions = {};
   bool _isLoading = true;
 
-  List<DynamicLeadField> get leadFields => _leadFields
-      .where((field) => field.isVisible)
-      .toList()
-    ..sort((a, b) => a.order.compareTo(b.order));
+  // 🚀 NAYA: Search Trigger logic
+  String? _activeSearchTab;
+  int _searchTriggerCount = 0;
+  String? get activeSearchTab => _activeSearchTab;
+  int get searchTriggerCount => _searchTriggerCount;
+
+  // 🚀 NAYA: Filter Trigger logic
+  int _leadFilterTriggerCount = 0;
+  int get leadFilterTriggerCount => _leadFilterTriggerCount;
+
+  void triggerLeadFilter() {
+    _leadFilterTriggerCount++;
+    notifyListeners();
+  }
+
+  // Manual timer to ensure NO DELAY on single tap
+  DateTime? _lastTapTime;
+  String? _lastTappedTab;
+
+  void handleFastTap(String tabKey, VoidCallback originalOnTap) {
+    final now = DateTime.now();
+    
+    // Check if this was a fast second tap for search
+    if (_lastTappedTab == tabKey && 
+        _lastTapTime != null && 
+        now.difference(_lastTapTime!) < const Duration(milliseconds: 500)) {
+      _activeSearchTab = tabKey;
+      _searchTriggerCount++;
+      _lastTapTime = null; // Reset
+      notifyListeners();
+    } else {
+      // 1. Trigger the tab switch IMMEDIATELY (No delay)
+      originalOnTap();
+      _lastTapTime = now;
+      _lastTappedTab = tabKey;
+    }
+  }
+
+  void triggerSearch(String tab) {
+    _activeSearchTab = tab;
+    _searchTriggerCount++;
+    notifyListeners();
+  }
+
+  List<DynamicLeadField> get leadFields {
+    final List<DynamicLeadField> fields = _leadFields.where((field) => field.isVisible).toList();
+    fields.sort((a, b) => a.order.compareTo(b.order));
+    return fields;
+  }
   List<DynamicLeadField> get allLeadFields => List.unmodifiable(_leadFields);
   List<DashboardTabConfig> get dashboardTabs => List.unmodifiable(_dashboardTabs);
   List<String> get leadStatuses => List.unmodifiable(_leadStatuses);
@@ -26,6 +73,7 @@ class AppConfigurationViewModel extends ChangeNotifier {
     ..._customRoles,
   ];
   List<CustomFormConfig> get customForms => List.unmodifiable(_customForms);
+  Map<String, Map<String, List<String>>> get fieldOptions => _fieldOptions;
   bool get isLoading => _isLoading;
 
   AppConfigurationViewModel() {
@@ -34,6 +82,7 @@ class AppConfigurationViewModel extends ChangeNotifier {
     _listenToRoles();
     _listenToCustomForms();
     _listenToStatuses();
+    _listenToFieldOptions();
   }
 
   List<DashboardTabConfig> tabsForRole(AppRole role) {
@@ -45,10 +94,11 @@ class AppConfigurationViewModel extends ChangeNotifier {
   }
 
   List<DashboardTabConfig> tabsForRoleKey(String roleKey) {
-    return _dashboardTabs
+    final List<DashboardTabConfig> tabs = _dashboardTabs
         .where((tab) => tab.isVisibleForRoleKey(roleKey))
-        .toList()
-      ..sort((a, b) => a.order.compareTo(b.order));
+        .toList();
+    tabs.sort((a, b) => a.order.compareTo(b.order));
+    return tabs;
   }
 
   String roleKeyForLabel(String roleLabel) {
@@ -78,17 +128,20 @@ class AppConfigurationViewModel extends ChangeNotifier {
   void _listenToLeadFields() {
     _db.collection('app_config').doc('lead_form').snapshots().listen((snapshot) {
       final rawFields = snapshot.data()?['fields'] as List<dynamic>?;
-      _leadFields = rawFields == null
-          ? const []
-          : rawFields
-              .whereType<Map>()
-              .map(
-                (field) => DynamicLeadField.fromMap(
-                  field.map((key, value) => MapEntry(key.toString(), value)),
-                ),
-              )
-              .toList()
-            ..sort((a, b) => a.order.compareTo(b.order));
+      if (rawFields == null) {
+        _leadFields = const [];
+      } else {
+        final List<DynamicLeadField> fields = rawFields
+            .whereType<Map>()
+            .map(
+              (field) => DynamicLeadField.fromMap(
+                field.map((key, value) => MapEntry(key.toString(), value)),
+              ),
+            )
+            .toList();
+        fields.sort((a, b) => a.order.compareTo(b.order));
+        _leadFields = fields;
+      }
       _isLoading = false;
       notifyListeners();
     });
@@ -97,17 +150,20 @@ class AppConfigurationViewModel extends ChangeNotifier {
   void _listenToTabs() {
     _db.collection('app_config').doc('dashboard_tabs').snapshots().listen((snapshot) {
       final rawTabs = snapshot.data()?['tabs'] as List<dynamic>?;
-      _dashboardTabs = rawTabs == null
-          ? _defaultTabs
-          : rawTabs
-              .whereType<Map>()
-              .map(
-                (tab) => DashboardTabConfig.fromMap(
-                  tab.map((key, value) => MapEntry(key.toString(), value)),
-                ),
-              )
-              .toList()
-            ..sort((a, b) => a.order.compareTo(b.order));
+      if (rawTabs == null) {
+        _dashboardTabs = _defaultTabs;
+      } else {
+        final List<DashboardTabConfig> tabs = rawTabs
+            .whereType<Map>()
+            .map(
+              (tab) => DashboardTabConfig.fromMap(
+                tab.map((key, value) => MapEntry(key.toString(), value)),
+              ),
+            )
+            .toList();
+        tabs.sort((a, b) => a.order.compareTo(b.order));
+        _dashboardTabs = tabs;
+      }
       _isLoading = false;
       notifyListeners();
     });
@@ -134,17 +190,20 @@ class AppConfigurationViewModel extends ChangeNotifier {
   void _listenToCustomForms() {
     _db.collection('app_config').doc('custom_forms').snapshots().listen((snapshot) {
       final rawForms = snapshot.data()?['forms'] as List<dynamic>?;
-      _customForms = rawForms == null
-          ? const []
-          : rawForms
-              .whereType<Map>()
-              .map(
-                (form) => CustomFormConfig.fromMap(
-                  form.map((key, value) => MapEntry(key.toString(), value)),
-                ),
-              )
-              .toList()
-            ..sort((a, b) => a.order.compareTo(b.order));
+      if (rawForms == null) {
+        _customForms = const [];
+      } else {
+        final List<CustomFormConfig> forms = rawForms
+            .whereType<Map>()
+            .map(
+              (form) => CustomFormConfig.fromMap(
+                form.map((key, value) => MapEntry(key.toString(), value)),
+              ),
+            )
+            .toList();
+        forms.sort((a, b) => a.order.compareTo(b.order));
+        _customForms = forms;
+      }
       notifyListeners();
     });
   }
@@ -160,6 +219,43 @@ class AppConfigurationViewModel extends ChangeNotifier {
         saveLeadStatuses(['Paid', 'Book', 'Hot', 'Warm', 'Cold', 'Think', 'Hold', 'Out']);
       }
     });
+  }
+
+  void _listenToFieldOptions() {
+    _db.collection('app_config').doc('field_options').snapshots().listen((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        final data = snapshot.data()!;
+        final Map<String, Map<String, List<String>>> parsed = {};
+        data.forEach((formKey, fields) {
+          if (fields is Map) {
+            final Map<String, List<String>> fieldMap = {};
+            fields.forEach((fieldId, options) {
+              if (options is List) {
+                fieldMap[fieldId.toString()] = List<String>.from(options);
+              }
+            });
+            parsed[formKey.toString()] = fieldMap;
+          }
+        });
+        _fieldOptions = parsed;
+        notifyListeners();
+      }
+    });
+  }
+
+  List<String> getOptionsForField(String formName, String fieldId, List<String> defaultOptions) {
+    if (_fieldOptions.containsKey(formName) && _fieldOptions[formName]!.containsKey(fieldId)) {
+      final custom = _fieldOptions[formName]![fieldId]!;
+      if (custom.isNotEmpty) return custom;
+    }
+    return defaultOptions;
+  }
+
+  Future<void> saveFieldOptions(Map<String, Map<String, List<String>>> options) async {
+    await _db.collection('app_config').doc('field_options').set(
+      options,
+      SetOptions(merge: true),
+    );
   }
 
   Future<void> saveLeadStatuses(List<String> statuses) async {

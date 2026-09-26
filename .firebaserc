@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "rswaapps"
-  }
+  },
+  "targets": {
+    "rswaapps": {
+      "hosting": {
+        "propertyplus": [
+          "propertyplus"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
