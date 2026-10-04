@@ -196,7 +196,7 @@ class _LeadDetailViewState extends State<LeadDetailView> {
             onDoubleTap: _globalToggle,
             behavior: HitTestBehavior.opaque,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
                   Icon(icon, color: const Color(0xFFFF6B22), size: 20.0),

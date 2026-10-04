@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:web/web.dart' as web;
+import 'web_reload_stub.dart' if (dart.library.js_interop) 'web_reload_web.dart';
 
 class StorageHelper {
   static const String _sessionKey = 'rswa_session_user_id';
@@ -44,7 +44,7 @@ class StorageHelper {
   static void reloadApp() {
     if (kIsWeb) {
       try {
-        web.window.location.reload();
+        reloadWeb();
       } catch (e) {
         debugPrint('STORAGE ERROR (Reload): $e');
       }

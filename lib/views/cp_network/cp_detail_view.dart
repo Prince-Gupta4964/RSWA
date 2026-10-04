@@ -73,12 +73,13 @@ class _CPDetailViewState extends State<CPDetailView> {
               expandedHeight: 380, pinned: true, backgroundColor: Colors.white, elevation: 0,
               leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () => context.go('/cp-list')),
               actions: [
-                Container(
-                  margin: const EdgeInsets.only(right: 16, top: 12, bottom: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                  decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: statusColor.withOpacity(0.4))),
-                  child: Center(child: Text(widget.cp.status.toUpperCase(), style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 10))),
-                ),
+                if (isAdmin)
+                  Container(
+                    margin: const EdgeInsets.only(right: 16, top: 12, bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                    decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: statusColor.withOpacity(0.4))),
+                    child: Center(child: Text(widget.cp.status.toUpperCase(), style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 10))),
+                  ),
               ],
               flexibleSpace: FlexibleSpaceBar(
                 background: Column(
@@ -121,13 +122,15 @@ class _CPDetailViewState extends State<CPDetailView> {
                   _detailRow('Location', widget.cp.location),
                   _detailRow('RERA ID', widget.cp.reraId),
                   const Divider(height: 32),
-                  const Text('Referral Chain', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+                  const Text('Referral Info', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
                   const SizedBox(height: 8),
-                  _detailRow('R1 (Direct)', data['referralName1'] ?? 'Direct'),
-                  _detailRow('R2 (Grandparent)', data['referralName2'] ?? 'Not available'),
-                  _detailRow('R3 (Great GP)', data['referralName3'] ?? 'Not available'),
-                  const SizedBox(height: 16),
-                  _visualChain(data),
+                  _detailRow('Referred By', data['referralName1'] ?? 'Direct Join'),
+                  if (isAdmin) ...[
+                    _detailRow('R2 (Grandparent)', data['referralName2'] ?? 'Not available'),
+                    _detailRow('R3 (Great GP)', data['referralName3'] ?? 'Not available'),
+                    const SizedBox(height: 16),
+                    _visualChain(data),
+                  ],
                 ]),
                 const SizedBox(height: 12),
 

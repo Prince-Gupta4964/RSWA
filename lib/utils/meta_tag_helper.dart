@@ -30,6 +30,7 @@ class MetaTagHelper {
       setMeta('property', 'og:title', fullTitle);
       setMeta('name', 'twitter:title', fullTitle);
 
+      setMeta('name', 'description', description);
       setMeta('property', 'og:description', description);
       setMeta('name', 'twitter:description', description);
 

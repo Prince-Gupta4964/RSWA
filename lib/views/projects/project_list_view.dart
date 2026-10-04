@@ -18,6 +18,7 @@ import '../../models/project_model.dart';
 import '../../utils/role_permissions.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_drawer.dart';
+import 'whatsapp_status_viewer.dart';
 
 class ProjectListView extends StatefulWidget {
   const ProjectListView({super.key});
@@ -38,7 +39,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   final FocusNode _searchFocusNode = FocusNode(); // 🚀 NAYA
 
   // --- Expanded Search Popup State ---
-  String _searchCategory = 'Residential';
+  String _searchCategory = 'All';
   bool _isDetectingLocation = false;
 
   final Map<String, List<String>> _activeFilters = {};
@@ -51,6 +52,9 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   bool get _isSelectionMode => _selectedProjectIds.isNotEmpty;
 
   List<String> _getCategoryTabs(AuthViewModel authVM) {
+    if (authVM.appRole == AppRole.viewer) {
+      return ['All Projects', 'Hot Projects', 'Fav Projects'];
+    }
     List<String> tabs = ['All Projects', 'My Projects'];
     if (authVM.appRole == AppRole.admin || authVM.appRole == AppRole.superAdmin) {
       tabs.add('Pending');
@@ -71,16 +75,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     final tabs = _getCategoryTabs(authVM);
     _tabController = TabController(length: tabs.length, vsync: this);
-
-    _tabController.addListener(() {
-      final currentTabs = _getCategoryTabs(authVM);
-      if (_selectedTab != currentTabs[_tabController.index]) {
-        setState(() {
-          _selectedTab = currentTabs[_tabController.index];
-          _selectedProjectIds.clear();
-        });
-      }
-    });
+    _tabController.addListener(_onTabChanged);
 
     // 🚀 NAYA: Auto-close search when focus is lost
     _searchFocusNode.addListener(() {
@@ -90,6 +85,29 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
         });
       }
     });
+  }
+
+  void _onTabChanged() {
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final currentTabs = _getCategoryTabs(authVM);
+    if (_tabController.index < currentTabs.length) {
+      if (_selectedTab != currentTabs[_tabController.index]) {
+        setState(() {
+          _selectedTab = currentTabs[_tabController.index];
+          _selectedProjectIds.clear();
+        });
+      }
+    }
+  }
+
+  void _syncTabController(List<String> tabs) {
+    if (_tabController.length != tabs.length) {
+      final oldIndex = _tabController.index;
+      _tabController.dispose();
+      final newIndex = oldIndex < tabs.length ? oldIndex : 0;
+      _tabController = TabController(length: tabs.length, vsync: this, initialIndex: newIndex);
+      _tabController.addListener(_onTabChanged);
+    }
   }
 
   @override
@@ -294,7 +312,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                   const Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   const SizedBox(height: 12),
                   Row(
-                    children: ['Residential', 'Commercial', 'Plot'].map((cat) {
+                    children: ['All', 'Residential', 'Commercial', 'Plot'].map((cat) {
                       bool isSelected = tempCategory == cat;
                       return Padding(
                         padding: const EdgeInsets.only(right: 8.0),
@@ -416,14 +434,13 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   }
 
   bool _matchesSearchCategory(String type) {
+    if (_searchCategory == 'All' || _searchCategory.isEmpty) return true;
     final t = type.toLowerCase();
     if (t == 'project') return true;
     if (_searchCategory == 'Residential') {
-      return t == 'flat' || t == 'bungalow';
+      return t == 'flat' || t == 'bungalow' || t == 'residential';
     } else if (_searchCategory == 'Commercial') {
-      return t == 'shop' ||
-          t == 'office' ||
-          t == 'showroom';
+      return t == 'shop' || t == 'office' || t == 'showroom' || t == 'commercial';
     } else if (_searchCategory == 'Plot') {
       return t == 'plot' || t == 'land';
     }
@@ -491,7 +508,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
       );
     }
 
-    if (_searchQuery.isNotEmpty || _searchCategory != 'Residential') {
+    if (_searchQuery.isNotEmpty || _searchCategory != 'All') {
       activeChips.insert(
         0,
         Padding(
@@ -506,7 +523,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
             deleteIconColor: Colors.blue.shade800,
             onDeleted: () => setState(() {
               _searchQuery = '';
-              _searchCategory = 'Residential';
+              _searchCategory = 'All';
             }),
           ),
         ),
@@ -514,6 +531,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     }
 
     final tabs = _getCategoryTabs(authVM);
+    _syncTabController(tabs);
 
     return PopScope(
       canPop: false,
@@ -704,23 +722,54 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                       controller: _tabController,
                       children: tabs.map((currentTabName) {
                         final displayProjects = projectVM.projects.where((project) {
-                          final isApproved = project.isApproved;
-                          final creatorUid = project.createdByUid;
+                          if (project.isDeleted) return false;
+
+                          final bool isApprovedBool = project.isApproved ||
+                              project.rawData['approvalStatus']?.toString().toLowerCase() == 'approved' ||
+                              project.rawData['isApproved'] == 'Yes' ||
+                              project.rawData['isApproved'] == true ||
+                              project.propertyDetails['isApproved'] == 'Yes' ||
+                              project.propertyDetails['isApproved'] == true;
+
+                          final String myUid = authVM.userUid.trim().toLowerCase();
+                          final String myEmail = authVM.userEmail.trim().toLowerCase();
+                          final String myName = authVM.userName.trim().toLowerCase();
+
+                          final String cUid = (project.createdByUid ?? '').trim().toLowerCase();
+                          final cb = project.rawData['createdBy'];
+                          final String cbUid = (cb is Map ? cb['uid'] ?? '' : '').toString().trim().toLowerCase();
+                          final String cbEmail = (cb is Map ? cb['email'] ?? '' : '').toString().trim().toLowerCase();
+                          final String cbName = (cb is Map ? cb['name'] ?? '' : '').toString().trim().toLowerCase();
+
+                          final ub = project.rawData['updatedBy'];
+                          final String ubUid = (ub is Map ? ub['uid'] ?? '' : '').toString().trim().toLowerCase();
+
+                          bool isMine = (cUid.isNotEmpty && (cUid == myUid || myUid.contains(cUid))) ||
+                              (cbUid.isNotEmpty && (cbUid == myUid || myUid.contains(cbUid))) ||
+                              (cbEmail.isNotEmpty && myEmail.isNotEmpty && (cbEmail == myEmail || myEmail.contains(cbEmail))) ||
+                              (cbName.isNotEmpty && myName.isNotEmpty && (cbName == myName || myName.contains(cbName))) ||
+                              (ubUid.isNotEmpty && (ubUid == myUid || myUid.contains(ubUid)) && authVM.appRole == AppRole.cp);
+
+                          final List<String> favUids = (project.rawData['favUids'] is Iterable) 
+                              ? List<String>.from(project.rawData['favUids']) 
+                              : ((project.propertyDetails['favUids'] is Iterable) 
+                                  ? List<String>.from(project.propertyDetails['favUids']) 
+                                  : []);
+                          final bool isLiked = authVM.userUid.isNotEmpty && favUids.contains(authVM.userUid);
 
                           if (currentTabName == 'All Projects') {
-                            if (!isApproved) return false;
+                            // 🚀 NAYA: Show approved projects TO EVERYONE, plus user's OWN submitted projects (even if pending) to the user!
+                            if (!isApprovedBool && !isMine) return false;
                           } else if (currentTabName == 'Pending') {
-                            if (isApproved) return false;
+                            if (isApprovedBool) return false;
                           } else if (currentTabName == 'My Projects') {
-                            if (creatorUid != authVM.userUid) return false;
+                            if (!isMine) return false;
                           } else if (currentTabName == 'Hot Projects') {
                             int rating = _projectRatings[project.id] ?? 0;
-                            bool liked = _likedProjects[project.id] ?? false;
-                            if (!project.isHot && rating < 4 && !liked) return false;
-                            if (!isApproved) return false;
+                            if (!project.isHot && rating < 4 && !isLiked) return false;
+                            if (!isApprovedBool) return false;
                           } else if (currentTabName == 'Fav Projects') {
-                            bool liked = _likedProjects[project.id] ?? false;
-                            if (!liked) return false;
+                            if (!isLiked) return false;
                           }
 
                           if (_searchQuery.isNotEmpty) {
@@ -799,7 +848,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
             ),
           ],
         ),
-        floatingActionButton: _isSelectionMode || !authVM.permissions.canAddProjects
+        floatingActionButton: (_isSelectionMode || !authVM.canAddProjects || authVM.appRole == AppRole.viewer)
             ? null
             : Padding(
                 padding: const EdgeInsets.only(bottom: 20.0),
@@ -868,37 +917,49 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     final bool showStatusControls = isAdmin && !project.isApproved;
     final details = project.propertyDetails;
     List<String> imageUrls = (details['images'] is Iterable) ? List<String>.from(details['images']) : [];
-    String getDisplayLocation() {
-      final loc = (details['googleLocation'] ?? details['areaName'] ?? details['location'] ?? details['address'] ??
-                   project.rawData['googleLocation'] ?? project.rawData['areaName'] ?? project.rawData['location'] ?? project.rawData['address'] ?? '')
-                  .toString().trim();
-      return loc.isNotEmpty && loc != 'null' ? loc : 'Location N/A';
-    }
-    final location = getDisplayLocation();
-    
-    String rawPrice = details['startingPrice']?.toString() ?? '';
-    if (rawPrice.isEmpty) {
-      if (project.propertyType == 'Land') {
-        if (details['minCostLand'] != null) {
-          rawPrice = '${details['minCostLand']}${details['maxCostLand'] != null ? ' - ${details['maxCostLand']}' : ''}';
+
+    final String? coverImg = (project.coverImage ?? details['coverImage'])?.toString().trim();
+    final String? displayImage = (coverImg != null && coverImg.isNotEmpty && coverImg.startsWith('http'))
+        ? coverImg
+        : (imageUrls.isNotEmpty ? imageUrls.first : null);
+
+    final location = project.displayLocation;
+
+    final minC = project.propertyType == 'Land' 
+        ? (details['minCostLand'] ?? details['minCost']) 
+        : (details['minCost'] ?? details['minCostLand']);
+    final maxC = project.propertyType == 'Land' 
+        ? (details['maxCostLand'] ?? details['maxCost']) 
+        : (details['maxCost'] ?? details['maxCostLand']);
+
+    String formattedPrice = 'On Request';
+    if (minC != null && minC.toString().trim().isNotEmpty) {
+      final String minStr = _formatSinglePrice(minC.toString().trim());
+      if (maxC != null && maxC.toString().trim().isNotEmpty) {
+        final String maxStr = _formatSinglePrice(maxC.toString().trim());
+        if (minStr != maxStr && maxStr.isNotEmpty && maxStr != 'N/A') {
+          formattedPrice = '$minStr - $maxStr';
+        } else {
+          formattedPrice = minStr;
         }
       } else {
-        if (details['minCost'] != null) {
-          rawPrice = '${details['minCost']}${details['maxCost'] != null ? ' - ${details['maxCost']}' : ''}';
-        }
+        formattedPrice = minStr;
       }
+    } else if (details['startingPrice'] != null && details['startingPrice'].toString().trim().isNotEmpty) {
+      formattedPrice = _formatPrice(details['startingPrice'].toString());
     }
+
+    final String subTypeTag = (details['subType'] ?? details['condition'] ?? '').toString().trim();
+    final String displayTag = subTypeTag.isNotEmpty ? subTypeTag : 'New';
     
-    String formattedPrice = _formatPrice(rawPrice);
+    final List<String> favUids = (project.rawData['favUids'] is Iterable) 
+        ? List<String>.from(project.rawData['favUids']) 
+        : ((details['favUids'] is Iterable) 
+            ? List<String>.from(details['favUids']) 
+            : []);
+    final bool isLiked = authVM.userUid.isNotEmpty && favUids.contains(authVM.userUid);
 
-    final condition = details['condition']?.toString() ?? 'New';
-    bool isLiked = _likedProjects[project.id] ?? false;
-    int currentRating = _projectRatings[project.id] ?? 0;
     final String currentApproval = (project.rawData['approvalStatus']?.toString() ?? (project.isApproved ? 'Approved' : 'Pending')).trim();
-
-    String bhk = details['bhk']?.toString() ?? '';
-    String area = details['carpetArea']?.toString() ?? details['totalArea']?.toString() ?? details['plotArea']?.toString() ?? '';
-    String subTitle = '${bhk.isNotEmpty && bhk != 'N/A' ? '$bhk ' : ''}${project.propertyType}${area.isNotEmpty && area != 'N/A' && area != ' Sq.ft' ? ' - $area' : ''}';
 
     IconData typeIcon = Icons.apartment_outlined;
     if (project.propertyType == 'Plot') typeIcon = Icons.landscape_outlined;
@@ -906,11 +967,13 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     else if (project.propertyType == 'Shop') typeIcon = Icons.storefront_outlined;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
+        border: Border(
+          top: BorderSide(color: Colors.grey.shade200, width: 0.8),
+          bottom: BorderSide(color: Colors.grey.shade200, width: 0.8),
+        ),
       ),
       child: Material(
         color: Colors.transparent,
@@ -920,176 +983,283 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
             else context.push('/project-detail/${project.id}', extra: project);
           },
           onLongPress: () => _toggleProjectSelection(project.id),
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
+          child: IntrinsicHeight(
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Stack(
-                  children: [
-                    // 🚀 NAYA: Image Height Badha Di (140) taaki badi dikhe
-                    Container(
-                      width: 110,
-                      height: 140,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: _selectedProjectIds.contains(project.id) ? Border.all(color: _primaryDark, width: 3) : null,
-                        image: imageUrls.isNotEmpty ? DecorationImage(image: NetworkImage(imageUrls.first), fit: BoxFit.cover) : null,
-                      ),
-                      child: imageUrls.isEmpty ? Center(child: Icon(typeIcon, color: Colors.grey.shade400, size: 40)) : null,
-                    ),
-                    if (_selectedProjectIds.contains(project.id))
-                      Positioned(
-                        top: 6,
-                        right: 6,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(color: _primaryDark, shape: BoxShape.circle),
-                          child: const Icon(Icons.check, color: Colors.white, size: 16),
+                SizedBox(
+                  width: 115,
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_isSelectionMode) {
+                        _toggleProjectSelection(project.id);
+                        return;
+                      }
+                      final List<String> allImages = [];
+                      if (displayImage != null) allImages.add(displayImage);
+                      for (var img in imageUrls) {
+                        if (img.isNotEmpty && !allImages.contains(img)) allImages.add(img);
+                      }
+                      final rawImgs = details['images'] is Iterable ? List<String>.from(details['images']) : [];
+                      for (var img in rawImgs) {
+                        if (img.isNotEmpty && !allImages.contains(img)) allImages.add(img);
+                      }
+                      final highImgs = details['highlightsImages'] is Iterable ? List<String>.from(details['highlightsImages']) : [];
+                      for (var img in highImgs) {
+                        if (img.isNotEmpty && !allImages.contains(img)) allImages.add(img);
+                      }
+                      final outImgs = details['outdoorsImages'] is Iterable ? List<String>.from(details['outdoorsImages']) : [];
+                      for (var img in outImgs) {
+                        if (img.isNotEmpty && !allImages.contains(img)) allImages.add(img);
+                      }
+
+                      if (allImages.isNotEmpty) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => WhatsAppStatusViewer(
+                              imageUrls: allImages,
+                              projectName: project.projectName,
+                              location: location,
+                              projectId: project.id,
+                            ),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No images available for status view.')));
+                      }
+                    },
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.zero,
+                            border: _selectedProjectIds.contains(project.id) ? Border.all(color: _primaryDark, width: 3) : null,
+                            image: displayImage != null ? DecorationImage(image: NetworkImage(displayImage), fit: BoxFit.cover) : null,
+                          ),
+                          child: displayImage == null ? Center(child: Icon(typeIcon, color: Colors.grey.shade400, size: 40)) : null,
                         ),
-                      ),
-                    Positioned(
-                      top: 6,
-                      left: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.photo_library_outlined, color: Colors.white, size: 10),
-                            const SizedBox(width: 4),
-                            Text('${imageUrls.length}+', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                          ],
+                        if (_selectedProjectIds.contains(project.id))
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(color: _primaryDark, shape: BoxShape.circle),
+                              child: const Icon(Icons.check, color: Colors.white, size: 16),
+                            ),
+                          ),
+                        Positioned(
+                          bottom: 6,
+                          left: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.play_circle_filled_rounded, color: Colors.white, size: 10),
+                                const SizedBox(width: 3),
+                                Text('Status', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        decoration: const BoxDecoration(
-                          color: Colors.black87,
-                          borderRadius: BorderRadius.only(bottomLeft: Radius.circular(12), bottomRight: Radius.circular(12)),
-                        ),
-                        child: const Text('Updated today', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 9)),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
                 const SizedBox(width: 14),
 
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 🚀 NAYA: Project Name Top Par Aa Gaya
-                      Text(project.projectName, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.black87)),
-                      const SizedBox(height: 4),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(formattedPrice == 'On Request' ? formattedPrice : '₹ $formattedPrice', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black87)),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: Colors.green.shade200),
-                            ),
-                            child: Text(condition, style: TextStyle(fontSize: 10, color: Colors.green.shade700, fontWeight: FontWeight.bold)),
-                          ),
-                          const SizedBox(width: 4),
-                          GestureDetector(
-                            onTap: () => setState(() => _likedProjects[project.id] = !isLiked),
-                            child: Icon(isLiked ? Icons.favorite : Icons.favorite_border, color: isLiked ? Colors.red : Colors.grey.shade400, size: 24),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-
-                      // 🚀 NAYA: Rating Flat/Bungalow (Property Type) Ke Saamne
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(project.propertyType, style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w500)),
-                          const SizedBox(width: 12),
-                          Row(
-                            children: List.generate(5, (starIndex) {
-                              return GestureDetector(
-                                onTap: () => setState(() => _projectRatings[project.id] = (currentRating == starIndex + 1) ? 0 : starIndex + 1),
-                                child: Padding(
-                                  padding: const EdgeInsets.only(right: 2),
-                                  child: Icon(
-                                    starIndex < currentRating ? Icons.star_rounded : Icons.star_outline_rounded,
-                                    color: Colors.amber.shade600,
-                                    size: 16,
-                                  ),
-                                ),
-                              );
-                            }),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      Row(
-                        children: [
-                          Icon(Icons.location_on, size: 14, color: Colors.grey.shade400),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(location, style: TextStyle(color: Colors.grey.shade500, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      if (showStatusControls)
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 3, 8, 3),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Line 1: Project Name + Green Tag + Fav Heart
                         Row(
                           children: [
-                            _statusActionButton(
-                              label: 'Approved',
-                              color: Colors.green.shade700,
-                              isCurrentStatus: project.isApproved || currentApproval.toLowerCase() == 'approved',
-                              onTap: () => _updateStatus(context, projectVM, authVM, project.id, 'Approved'),
+                            Expanded(
+                              child: Text(
+                                project.projectName,
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.black87),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            const SizedBox(width: 4),
-                            _statusActionButton(
-                              label: 'Reject',
-                              color: Colors.red.shade700,
-                              isCurrentStatus: currentApproval.toLowerCase() == 'reject' || currentApproval.toLowerCase() == 'rejected',
-                              onTap: () => _updateStatus(context, projectVM, authVM, project.id, 'Reject'),
+                            const SizedBox(width: 6),
+                            Container(
+                              constraints: const BoxConstraints(minWidth: 54),
+                              alignment: Alignment.center,
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.green.shade200, width: 1.2),
+                              ),
+                              child: Text(
+                                displayTag,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 11, color: Colors.green.shade700, fontWeight: FontWeight.bold),
+                              ),
                             ),
-                            const SizedBox(width: 4),
-                            _statusActionButton(
-                              label: 'Process',
-                              color: Colors.blue.shade700,
-                              isCurrentStatus: currentApproval.toLowerCase() == 'process',
-                              onTap: () => _updateStatus(context, projectVM, authVM, project.id, 'Process'),
+                            const SizedBox(width: 6),
+                            GestureDetector(
+                              onTap: () {
+                                if (authVM.userUid.isNotEmpty) {
+                                  projectVM.toggleProjectFavorite(project.id, authVM.userUid, favUids);
+                                }
+                              },
+                              child: Icon(isLiked ? Icons.favorite : Icons.favorite_border, color: isLiked ? Colors.red : Colors.grey.shade400, size: 22),
                             ),
-                            const SizedBox(width: 4),
-                            _statusActionButton(
-                              label: 'Hold',
-                              color: Colors.amber.shade800,
-                              isCurrentStatus: currentApproval.toLowerCase() == 'hold',
-                              onTap: () => _updateStatus(context, projectVM, authVM, project.id, 'Hold'),
-                            ),
-                          ],
-                        )
-                      else
-                        Row(
-                          children: [
-                            _actionButton('Get Quote', () => _handleGetQuote(context, project)),
-                            const SizedBox(width: 10),
-                            _actionButton('Get Brochure', () => _handleGetBrochure(context, project)),
                           ],
                         ),
-                    ],
+                        const SizedBox(height: 2),
+
+                        // Line 2: Price Only
+                        Text(
+                          formattedPrice == 'On Request' ? formattedPrice : '₹ $formattedPrice',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black87),
+                        ),
+                        const SizedBox(height: 2),
+
+                        // Line 3: Property Type | 4.5 ⭐⭐⭐⭐⭐ (2)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(project.propertyType, style: TextStyle(color: Colors.grey.shade600, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                            const SizedBox(width: 8),
+                            Text('|', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                            const SizedBox(width: 8),
+                            Text(
+                              project.avgRating > 0 ? project.avgRating.toStringAsFixed(1) : '0.0',
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.black87),
+                            ),
+                            const SizedBox(width: 4),
+                            Row(
+                              children: List.generate(5, (starIndex) {
+                                final double rating = project.avgRating;
+                                final bool isFilled = starIndex < (rating > 0 ? rating : 5);
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 1),
+                                  child: Icon(
+                                    isFilled ? Icons.star_rounded : Icons.star_outline_rounded,
+                                    color: Colors.amber,
+                                    size: 15,
+                                  ),
+                                );
+                              }),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '(${project.ratingCount})',
+                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+
+                        // Line 4: Location Pin + Text
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_rounded, size: 14, color: Color(0xFFFF6B22)),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(location, style: TextStyle(color: Colors.grey.shade600, fontSize: 12.5, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 7),
+
+                        // Line 5: Buttons Row
+                        if (showStatusControls)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _statusActionButton(
+                                  label: 'Approved',
+                                  color: Colors.green.shade700,
+                                  isCurrentStatus: project.isApproved || currentApproval.toLowerCase() == 'approved',
+                                  onTap: () => _updateStatus(context, projectVM, authVM, project.id, 'Approved'),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _statusActionButton(
+                                  label: 'Reject',
+                                  color: Colors.red.shade700,
+                                  isCurrentStatus: currentApproval.toLowerCase() == 'reject' || currentApproval.toLowerCase() == 'rejected',
+                                  onTap: () => _updateStatus(context, projectVM, authVM, project.id, 'Reject'),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _statusActionButton(
+                                  label: 'Process',
+                                  color: Colors.blue.shade700,
+                                  isCurrentStatus: currentApproval.toLowerCase() == 'process',
+                                  onTap: () => _updateStatus(context, projectVM, authVM, project.id, 'Process'),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _statusActionButton(
+                                  label: 'Hold',
+                                  color: Colors.amber.shade800,
+                                  isCurrentStatus: currentApproval.toLowerCase() == 'hold',
+                                  onTap: () => _updateStatus(context, projectVM, authVM, project.id, 'Hold'),
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => _handleGetQuote(context, project),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: Colors.grey.shade400),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                  ),
+                                  child: const Text('Get Details', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => _handleGetBrochure(context, project),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: Colors.grey.shade400),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                  ),
+                                  child: const Text('Get Brochure', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                height: 36,
+                                width: 36,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.grey.shade400),
+                                ),
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  icon: const Icon(Icons.share_outlined, color: Colors.black87, size: 18),
+                                  onPressed: () => _handleShareProject(context, project),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -1297,12 +1467,80 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   }
 
   void _handleGetQuote(BuildContext context, ProjectModel project) {
-    context.push('/project-detail/${project.id}', extra: project);
+    final details = project.propertyDetails;
+    final String propertyName = project.projectName;
+    final String companyName = (details['projectCompany'] ?? project.rawData['projectCompany'] ?? '').toString().trim();
+    final String loc = (details['location'] ?? details['googleLocation'] ?? details['areaName'] ?? details['address'] ?? project.rawData['location'] ?? '').toString().trim();
+    final String location = loc.isNotEmpty && loc != 'null' ? loc : 'Location N/A';
+
+    final String message = "Property Name: $propertyName\n"
+        "Company Name: ${companyName.isNotEmpty ? companyName : 'N/A'}\n"
+        "Location: $location\n\n"
+        "I want more details about this project";
+
+    final String phone = '8793693314';
+    final Uri whatsappUri = Uri.parse('https://wa.me/91$phone?text=${Uri.encodeComponent(message)}');
+    
+    launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
   }
 
   bool _matchesSelectedCondition(ProjectModel project) {
     if (_selectedConditionFilter == null || _selectedConditionFilter!.isEmpty) return true;
     final condition = project.propertyDetails['condition']?.toString().trim().toLowerCase() ?? 'new';
     return condition == _selectedConditionFilter!.trim().toLowerCase();
+  }
+
+  Map<String, Color> _getSubTypeColors(String subType) {
+    final st = subType.trim().toLowerCase();
+    
+    if (st == 'new' || st == 'new launch') {
+      return {
+        'bg': const Color(0xFFE6F4EA), // Emerald Green
+        'text': const Color(0xFF137333),
+        'border': const Color(0xFFCEEAD6),
+      };
+    } else if (st == 'uc' || st == 'under construction') {
+      return {
+        'bg': const Color(0xFFFEF7E0), // Amber / Gold
+        'text': const Color(0xFFB06000),
+        'border': const Color(0xFFFDE293),
+      };
+    } else if (st == 'resale') {
+      return {
+        'bg': const Color(0xFFF3E8FF), // Purple / Lavender
+        'text': const Color(0xFF6B21A8),
+        'border': const Color(0xFFE9D5FF),
+      };
+    } else if (st == 'rent') {
+      return {
+        'bg': const Color(0xFFE8F0FE), // Soft Blue
+        'text': const Color(0xFF1A73E8),
+        'border': const Color(0xFFAECBFA),
+      };
+    } else if (st == 'rtm' || st == 'ready to move') {
+      return {
+        'bg': const Color(0xFFE0F2FE), // Teal / Sky Blue
+        'text': const Color(0xFF0369A1),
+        'border': const Color(0xFFBAE6FD),
+      };
+    } else if (st == 'na' || st == 'non-agricultural') {
+      return {
+        'bg': const Color(0xFFECFDF5), // Mint Green
+        'text': const Color(0xFF047857),
+        'border': const Color(0xFFA7F3D0),
+      };
+    } else if (st == 'non - na' || st == 'non na' || st == 'agricultural') {
+      return {
+        'bg': const Color(0xFFFFF1F2), // Rose Pink
+        'text': const Color(0xFFBE123C),
+        'border': const Color(0xFFFECDD3),
+      };
+    }
+
+    return {
+      'bg': const Color(0xFFF1F5F9), // Slate Grey
+      'text': const Color(0xFF334155),
+      'border': const Color(0xFFCBD5E1),
+    };
   }
 }

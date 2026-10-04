@@ -76,6 +76,16 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         });
       }
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (authVM.isAuthenticated && authVM.appRole == AppRole.viewer) {
+        final bool isComplete = authVM.userData?['isProfileComplete'] == true &&
+                                (authVM.userData?['contactNo'] ?? '').toString().trim().isNotEmpty;
+        if (!isComplete) {
+          context.go('/customer-form');
+        }
+      }
+    });
   }
 
   @override
@@ -613,7 +623,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         ),
       ),
 
-      floatingActionButton: (authVM.permissions.canAddLeads && authVM.isApproved)
+      floatingActionButton: authVM.canAddLeads
           ? Padding(
               padding: const EdgeInsets.only(bottom: 20),
               child: FloatingActionButton(

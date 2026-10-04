@@ -10,6 +10,7 @@ import '../../services/firebase_storage_service.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/cp_viewmodel.dart';
 import '../../utils/cp_form_config.dart';
+import '../../utils/role_permissions.dart';
 
 class CompleteProfileView extends StatefulWidget {
   const CompleteProfileView({super.key});
@@ -45,6 +46,15 @@ class _CompleteProfileViewState extends State<CompleteProfileView> {
     final userData = authVM.userData ?? {};
     
     _formData['partnerType'] = userData['partnerType'] ?? 'CP';
+
+    // 🚀 Pre-select Source = "Referral" if referred by link or user
+    final String refName = (userData['referralName1'] ?? userData['referredBy'] ?? userData['addedBy'] ?? '').toString().trim();
+    if (refName.isNotEmpty || userData['source'] == 'Referral' || userData['parentUid'] != null) {
+      _formData['source'] = 'Referral';
+      if (refName.isNotEmpty) {
+        _formData['referralName1'] = refName;
+      }
+    }
 
     for (var section in CPFormStrings.formStructure) {
       for (var field in section['fields']) {
@@ -178,7 +188,19 @@ class _CompleteProfileViewState extends State<CompleteProfileView> {
             child: ListView(
               padding: const EdgeInsets.only(bottom: 100, top: 16),
               children: CPFormStrings.formStructure
-                .where((s) => s['title'] != CPFormStrings.sectionLoginCredentials)
+                .where((s) {
+                  if (s['title'] == CPFormStrings.sectionLoginCredentials) return false;
+                  if (s.containsKey('roles')) {
+                    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+                    final List<String> allowedRoles = List<String>.from(s['roles']);
+                    final String currentRoleKey = appRoleKey(authVM.appRole);
+                    final bool isAdmin = authVM.appRole == AppRole.admin || authVM.appRole == AppRole.superAdmin;
+                    if (!allowedRoles.contains(currentRoleKey) && !allowedRoles.contains('all') && !isAdmin) {
+                      return false;
+                    }
+                  }
+                  return true;
+                })
                 .map<Widget>((section) {
                   return _buildSection(section);
                 }).toList(),
@@ -201,7 +223,7 @@ class _CompleteProfileViewState extends State<CompleteProfileView> {
           onTap: () => _toggleSection(title),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: isExpanded ? primaryColor.withValues(alpha: 0.1) : Colors.white,
               border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
@@ -240,19 +262,37 @@ class _CompleteProfileViewState extends State<CompleteProfileView> {
     );
   }
 
+  bool _isFieldVisible(Map<String, dynamic> field) {
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final bool isAdmin = authVM.appRole == AppRole.admin || authVM.appRole == AppRole.superAdmin;
+    
+    if (field.containsKey('roles')) {
+      final List<String> allowedRoles = List<String>.from(field['roles']);
+      final String currentRoleKey = appRoleKey(authVM.appRole);
+      if (!allowedRoles.contains(currentRoleKey) && !allowedRoles.contains('all') && !isAdmin) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   Widget _buildDynamicField(Map<String, dynamic> field) {
+    if (!_isFieldVisible(field)) return const SizedBox.shrink();
     final String type = field['type'];
 
     if (type == 'row') {
+      final visibleSubFields = (field['fields'] as List).where((f) => _isFieldVisible(f)).toList();
+      if (visibleSubFields.isEmpty) return const SizedBox.shrink();
+
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: (field['fields'] as List).map<Widget>((f) {
+          children: visibleSubFields.map<Widget>((f) {
             return Expanded(
               child: Padding(
                 padding: EdgeInsets.only(
-                  right: (field['fields'] as List).last == f ? 0 : 8,
+                  right: visibleSubFields.last == f ? 0 : 8,
                 ),
                 child: _buildFieldContent(f),
               ),

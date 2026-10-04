@@ -49,6 +49,7 @@ class UserManagementViewModel extends ChangeNotifier {
     required String role,
     required String baseRole,
     required bool isActive,
+    String? contactNo,
   }) async {
     _ensureUserChangeAllowed(
       actorRole: actorRole,
@@ -75,6 +76,9 @@ class UserManagementViewModel extends ChangeNotifier {
       'role': role,
       'baseRole': baseRole,
       'isActive': isActive,
+      'contactNo': contactNo?.trim() ?? '',
+      'whatsappNo': contactNo?.trim() ?? '',
+      'referralCode': contactNo?.trim() ?? '',
       'updatedAt': FieldValue.serverTimestamp(),
     };
 

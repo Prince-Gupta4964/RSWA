@@ -38,6 +38,7 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
     return [
       {'id': 'my_cp', 'label': 'My CP'},
       if (isAdmin) {'id': 'all_cp', 'label': 'All CP'},
+      if (isAdmin) {'id': 'customers', 'label': 'Customers'},
       {'id': 'fav_cp', 'label': 'Fav CP'},
       {'id': 'builders', 'label': 'Builders'},
       {'id': 'investors', 'label': 'Investors'},
@@ -118,8 +119,17 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
           return isAdmin || isOwn;
 
         case 'pending':
-          if (!isPending) return false;
+          final bool isCustomerRole = cp.rawData['role']?.toString().toLowerCase() == 'viewer' ||
+              cp.profession.toLowerCase() == 'viewer' ||
+              cp.rawData['collection'] == 'customers';
+          if (!isPending && !isCustomerRole) return false;
           return isAdmin || isOwn;
+
+        case 'customers':
+          return (cp.rawData['collection'] == 'customers') ||
+                 (cp.rawData['role']?.toString().toLowerCase() == 'viewer') ||
+                 (cp.rawData['profession']?.toString().toLowerCase() == 'viewer') ||
+                 (cp.profession.toLowerCase() == 'viewer');
 
         default:
           return true;
@@ -848,11 +858,22 @@ class _CPTileState extends State<_CPTile> {
     final bool isFav = favUids.contains(authVM.userUid);
     final bool isPending = !widget.cp.isApproved || widget.cp.status.toLowerCase().contains('pending');
 
+    final bool isCustomerRole = widget.cp.rawData['role']?.toString().toLowerCase() == 'viewer' ||
+        widget.cp.profession.toLowerCase() == 'viewer';
+    final bool isUpgradeRequested = widget.cp.rawData['cpUpgradeRequested'] == true ||
+        widget.cp.rawData['upgradeStatus'] == 'Waiting for Approval';
+
     final String firstLetter = widget.cp.fullName.trim().isEmpty ? '?' : widget.cp.fullName.trim()[0].toUpperCase();
     
     final String rawStatus = widget.cp.status.trim().toUpperCase();
     String displayStatus = rawStatus.isEmpty ? 'INACTIVE' : rawStatus;
-    if (rawStatus.contains('ACTIVE')) {
+    if (isCustomerRole) {
+      if (isUpgradeRequested) {
+        displayStatus = 'WAITING APPROVAL';
+      } else {
+        displayStatus = 'CUSTOMER';
+      }
+    } else if (rawStatus.contains('ACTIVE')) {
       displayStatus = 'ACTIVE';
     } else if (rawStatus.contains('PENDING')) {
       displayStatus = 'PENDING';
@@ -861,8 +882,10 @@ class _CPTileState extends State<_CPTile> {
     Color statusColor;
     if (displayStatus == 'ACTIVE') {
       statusColor = Colors.green.shade700;
-    } else if (displayStatus == 'PENDING' || isPending) {
+    } else if (displayStatus == 'PENDING' || isPending || displayStatus == 'WAITING APPROVAL') {
       statusColor = Colors.amber.shade800;
+    } else if (displayStatus == 'CUSTOMER') {
+      statusColor = Colors.blue.shade600;
     } else {
       statusColor = Colors.grey.shade600;
     }
@@ -979,7 +1002,37 @@ class _CPTileState extends State<_CPTile> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          if (isAdmin && isPending)
+                          if (isAdmin && isCustomerRole)
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                final docId = widget.cp.id;
+                                final col = widget.cp.rawData['collection'] == 'customers' ? 'customers' : 'cps';
+
+                                await FirebaseFirestore.instance.collection(col).doc(docId).set({
+                                  'role': 'cp',
+                                  'isApproved': true,
+                                  'cpUpgradeRequested': false,
+                                  'upgradeStatus': 'Approved',
+                                  'status': 'Channel Partner',
+                                  'profession': 'Channel Partner',
+                                }, SetOptions(merge: true));
+
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Customer Upgraded & Approved as Channel Partner!'), backgroundColor: Colors.green),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.workspace_premium_rounded, size: 16, color: Colors.white),
+                              label: const Text('APPROVE AS CP', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF6B22),
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            )
+                          else if (isAdmin && isPending)
                             ElevatedButton.icon(
                               onPressed: () async {
                                 await cpVM.approveCP(widget.cp.id, authVM.actorMetadata);

@@ -2,16 +2,48 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../utils/role_permissions.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
 
+  void _applyToBecomeCP(BuildContext context, AuthViewModel authVM) async {
+    try {
+      final docId = authVM.userUid;
+      final collection = authVM.userData?['collection'] == 'customers' ? 'customers' : 'users';
+      await FirebaseFirestore.instance.collection(collection).doc(docId).set({
+        'cpUpgradeRequested': true,
+        'upgradeStatus': 'Waiting for Approval',
+        'requestedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('CP Upgrade Request submitted! Waiting for Admin approval.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authVM = Provider.of<AuthViewModel>(context);
     final navigationShell = StatefulNavigationShell.of(context);
+
+    final bool isWaitingApproval = authVM.userData?['cpUpgradeRequested'] == true ||
+        authVM.userData?['upgradeStatus'] == 'Waiting for Approval';
 
     return Drawer(
       backgroundColor: Colors.white,
@@ -22,6 +54,34 @@ class AppDrawer extends StatelessWidget {
             _buildHeader(context, authVM),
             const SizedBox(height: 20),
             const Divider(),
+
+            // Customer Upgrade Option: Apply to Become CP / Waiting for Approval
+            if (authVM.appRole == AppRole.viewer) ...[
+              ListTile(
+                leading: Icon(
+                  isWaitingApproval ? Icons.hourglass_top_rounded : Icons.workspace_premium_rounded,
+                  color: isWaitingApproval ? Colors.amber.shade800 : const Color(0xFFFF6B22),
+                ),
+                title: Text(
+                  isWaitingApproval ? 'Waiting for Approval' : 'Apply to Become CP',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isWaitingApproval ? Colors.amber.shade800 : const Color(0xFFFF6B22),
+                  ),
+                ),
+                subtitle: Text(
+                  isWaitingApproval ? 'CP upgrade under Admin review' : 'Upgrade account to Channel Partner',
+                  style: const TextStyle(fontSize: 11),
+                ),
+                onTap: isWaitingApproval
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        _applyToBecomeCP(context, authVM);
+                      },
+              ),
+              const Divider(),
+            ],
             
             // Referral Link (For CPs and Admins)
             if (authVM.appRole == AppRole.cp || authVM.canManageUsers)

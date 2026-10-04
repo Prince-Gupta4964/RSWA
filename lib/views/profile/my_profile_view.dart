@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../viewmodels/auth_viewmodel.dart';
+import '../../utils/role_permissions.dart';
 
 class MyProfileView extends StatelessWidget {
   const MyProfileView({super.key});
@@ -84,6 +86,99 @@ class MyProfileView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
+
+          if (authVM.appRole == AppRole.viewer) ...[
+            () {
+              final bool isWaitingApproval = data['cpUpgradeRequested'] == true || data['upgradeStatus'] == 'Waiting for Approval';
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isWaitingApproval ? Colors.amber.shade50 : const Color(0xFFFFF1EA),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isWaitingApproval ? Colors.amber.shade300 : const Color(0xFFFFD4C2)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isWaitingApproval ? Icons.hourglass_top_rounded : Icons.workspace_premium_rounded,
+                          color: isWaitingApproval ? Colors.amber.shade800 : const Color(0xFFFF6B22),
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isWaitingApproval ? 'Waiting for Approval' : 'Become a Channel Partner',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: isWaitingApproval ? Colors.amber.shade900 : const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                isWaitingApproval
+                                    ? 'Your CP upgrade request is under review by Admin.'
+                                    : 'Upgrade your account to add leads, list properties, and earn commissions.',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (!isWaitingApproval) ...[
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            try {
+                              final docId = authVM.userUid;
+                              final collection = authVM.userData?['collection'] == 'customers' ? 'customers' : 'users';
+                              await FirebaseFirestore.instance.collection(collection).doc(docId).set({
+                                'cpUpgradeRequested': true,
+                                'upgradeStatus': 'Waiting for Approval',
+                                'requestedAt': FieldValue.serverTimestamp(),
+                              }, SetOptions(merge: true));
+
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('CP Upgrade Request submitted! Waiting for Admin approval.'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                                );
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFF6B22),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                          child: const Text('Apply to Become CP', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }(),
+            const SizedBox(height: 16),
+          ],
 
           _buildInfoCard(
             title: 'Notifications',

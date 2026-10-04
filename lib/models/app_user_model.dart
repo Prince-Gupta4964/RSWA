@@ -8,6 +8,7 @@ class AppUserModel {
   final String role;
   final String baseRole;
   final bool isActive;
+  final String contactNo;
 
   const AppUserModel({
     required this.id,
@@ -17,6 +18,7 @@ class AppUserModel {
     required this.role,
     required this.baseRole,
     required this.isActive,
+    required this.contactNo,
   });
 
   AppRole get appRole {
@@ -35,6 +37,7 @@ class AppUserModel {
       baseRole: (data['baseRole'] ?? '').toString(),
       isActive: data['isActive'] == true ||
           data['isActive']?.toString().toLowerCase() == 'true',
+      contactNo: (data['contactNo'] ?? data['whatsappNo'] ?? '').toString().trim(),
     );
   }
 }

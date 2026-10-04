@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb; // 🚀 NAYA
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // 🚀 NAYA
 import '../utils/meta_tag_helper.dart'; // 🚀 NAYA
+import '../utils/role_permissions.dart'; // 🚀 NAYA
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,6 +14,7 @@ import '../viewmodels/cp_viewmodel.dart';
 import '../viewmodels/project_viewmodel.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../views/auth/login_view.dart';
+import '../views/auth/customer_form_view.dart';
 import '../views/dashboard/dashboard_view.dart';
 import '../views/admin/admin_console_view.dart';
 import '../views/forms/custom_form_view.dart';
@@ -41,6 +43,7 @@ import '../widgets/app_drawer.dart';
 import '../features/map_screen/screens/map_screen.dart';
 import '../features/map_screen/screens/task_detail_page.dart';
 import '../features/map_screen/screens/assignee_tasks_view.dart';
+import '../views/shared_widgets/widget_showcase_screen.dart';
 import '../features/map_screen/models/task.dart';
 
 class AppRouter {
@@ -58,6 +61,11 @@ class AppRouter {
           return NoTransitionPage(child: LoginView(initialReferralCode: referralCode, mode: mode));
         },
       ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/customer-form',
+        pageBuilder: (context, state) => const NoTransitionPage(child: CustomerFormView()),
+      ),
 
       // --- MAIN SHELL (Main Tabs with persistent Bottom Nav) ---
       StatefulShellRoute.indexedStack(
@@ -70,8 +78,19 @@ class AppRouter {
             routes: [
               GoRoute(
                 path: '/dashboard',
-                pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: AuthGuard(child: DashboardView())),
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: AuthGuard(
+                    child: Builder(
+                      builder: (context) {
+                        final authVM = Provider.of<AuthViewModel>(context);
+                        if (authVM.appRole == AppRole.viewer) {
+                          return const ProjectListView();
+                        }
+                        return const DashboardView();
+                      },
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -339,6 +358,11 @@ class AppRouter {
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
+        path: '/widget-showcase',
+        builder: (context, state) => const AuthGuard(child: WidgetShowcaseScreen()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/assignee-tasks',
         builder: (context, state) {
           final args = state.extra as Map<String, dynamic>?;
@@ -527,19 +551,23 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final authVM = Provider.of<AuthViewModel>(context);
+    final String currentLoc = GoRouterState.of(context).uri.toString();
+    final bool hideBottomNav = !authVM.isProfileComplete ||
+        !authVM.isApproved ||
+        currentLoc.contains('complete-profile') ||
+        currentLoc.contains('approval-pending');
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        final authVM = Provider.of<AuthViewModel>(context, listen: false);
         final allowed = authVM.permissions.dashboardTabs;
         if (allowed.isNotEmpty) {
            final firstTab = allowed.first;
-           // Map tab key to index
            int targetIdx = 0;
            if (firstTab == 'projects') targetIdx = 1;
            else if (firstTab == 'cp') targetIdx = 2;
-           // ... etc
            if (widget.navigationShell.currentIndex != targetIdx) {
               widget.navigationShell.goBranch(targetIdx);
            }
@@ -547,16 +575,18 @@ class _MainShellState extends State<MainShell> {
       },
       child: Scaffold(
         body: widget.navigationShell,
-        bottomNavigationBar: AppBottomNav(
-          navigationShell: widget.navigationShell,
-          currentTab: _getTabKey(widget.navigationShell.currentIndex),
-          backgroundColor: Colors.white,
-          activeIconColor: Colors.black87,
-          activeLabelColor: Colors.black87,
-          inactiveIconColor: Colors.grey.shade400,
-          projectsLabel: 'Projects',
-          cpLabel: 'Network',
-        ),
+        bottomNavigationBar: hideBottomNav
+            ? null
+            : AppBottomNav(
+                navigationShell: widget.navigationShell,
+                currentTab: _getTabKey(widget.navigationShell.currentIndex),
+                backgroundColor: Colors.white,
+                activeIconColor: Colors.black87,
+                activeLabelColor: Colors.black87,
+                inactiveIconColor: Colors.grey.shade400,
+                projectsLabel: 'Projects',
+                cpLabel: 'Network',
+              ),
       ),
     );
   }

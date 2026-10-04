@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -5,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // 🚀 NAYA
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/storage_helper.dart';
 import '../utils/role_permissions.dart';
@@ -26,9 +27,11 @@ class AuthViewModel extends ChangeNotifier {
   String? _subscribedUserId;
   String? _currentReferralCode; // 🚀 NAYA: Global tracking for Web Google login
   String? _signupMode; // 🚀 NAYA
+  GoogleSignInAccount? _lastGoogleUser;
 
   String? get userId => _userId;
   String? get userRole => _userRole;
+  GoogleSignInAccount? get lastGoogleUser => _lastGoogleUser;
   Map<String, dynamic>? get userData => _userData;
   bool get isCheckingSession => _isCheckingSession;
   bool get isAuthenticated => _userId != null && _userData != null;
@@ -70,8 +73,26 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   // 🚀 NAYA: Status getters for CPs
-  bool get isApproved => _userData?['isApproved'] == true || _permissionRole != AppRole.cp;
+  bool get isApproved {
+    if (_permissionRole == AppRole.cp) {
+      final bool isPendingStatus = _userData?['cpUpgradeRequested'] == true ||
+          _userData?['upgradeStatus']?.toString().toLowerCase() == 'waiting for approval' ||
+          _userData?['status']?.toString().toLowerCase() == 'pending' ||
+          _userData?['isApproved'] == false ||
+          _userData?['isApproved']?.toString().toLowerCase() == 'false' ||
+          _userData?['isApproved'] == null;
+      
+      if (isPendingStatus) return false;
+
+      final val = _userData?['isApproved'];
+      return val == true || val?.toString().toLowerCase() == 'true';
+    }
+    return true;
+  }
   bool get isProfileComplete => _userData?['isProfileComplete'] == true || _permissionRole != AppRole.cp;
+
+  bool get canAddProjects => permissions.canAddProjects && isApproved;
+  bool get canAddLeads => permissions.canAddLeads && isApproved;
 
   Map<String, dynamic> get actorMetadata => {
     'uid': userUid,
@@ -80,12 +101,40 @@ class AuthViewModel extends ChangeNotifier {
     'role': roleLabel,
   };
 
-  void updateReferralCode(String? code) {
+  Future<void> updateReferralCode(String? code) async {
     _currentReferralCode = code;
+    if (code != null && code.trim().isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('rswa_pending_referral_code', code.trim());
+    }
     notifyListeners();
   }
 
   AuthViewModel() {
+    // 🚀 NAYA: Extract referral code from URL / hash fragment on startup (for Web OAuth redirects)
+    try {
+      String? ref = Uri.base.queryParameters['ref'];
+      if (ref == null || ref.isEmpty) {
+        final fragment = Uri.base.fragment;
+        if (fragment.contains('?')) {
+          final queryString = fragment.split('?').last;
+          final uriQuery = Uri.splitQueryString(queryString);
+          if (uriQuery.containsKey('ref') && uriQuery['ref'] != null) {
+            ref = uriQuery['ref'];
+          }
+        }
+      }
+      if (ref != null && ref.trim().isNotEmpty) {
+        _currentReferralCode = ref.trim();
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('rswa_pending_referral_code', ref!.trim());
+        });
+        debugPrint('AUTH: Extracted and saved referral code from URL: $ref');
+      }
+    } catch (e) {
+      debugPrint('AUTH: Error extracting referral code on startup: $e');
+    }
+
     // Listen for users from programmatic flow (Mobile) or renderButton (Web)
     _googleSignIn.authenticationEvents.listen((event) {
       if (event is GoogleSignInAuthenticationEventSignIn) {
@@ -100,14 +149,24 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   Future<void> _handleGoogleUserChanged(GoogleSignInAccount googleUser) async {
+    _lastGoogleUser = googleUser;
     try {
       final email = googleUser.email.trim().toLowerCase();
       var userDoc = await _findUserByEmail(email, email);
       
       // 🚀 NAYA: If user doesn't exist, automatically register them using current referral code
       if (userDoc == null) {
-        await _registerNewCP(email, googleUser.displayName, _currentReferralCode);
+        String? activeRefCode = _currentReferralCode;
+        if (activeRefCode == null || activeRefCode.isEmpty) {
+          final prefs = await SharedPreferences.getInstance();
+          activeRefCode = prefs.getString('rswa_pending_referral_code');
+        }
+
+        await _registerNewCP(email, googleUser.displayName, activeRefCode);
         userDoc = await _findUserByEmail(email, email);
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('rswa_pending_referral_code');
       }
 
       if (userDoc == null) {
@@ -134,41 +193,50 @@ class AuthViewModel extends ChangeNotifier {
   Future<void> _registerNewCP(String email, String? displayName, String? referralCode) async {
     String? referrerUid;
     String referrerName = "Self Signup";
+    String ref2Name = "";
+    String ref3Name = "";
 
-    // 🚀 NAYA: Robust lookup for Referrer using Referral Code (Phone)
+    // 🚀 NAYA: Robust multi-level lookup for Referrer across cps & users (matching last 10 digits)
     if (referralCode != null && referralCode.trim().isNotEmpty) {
-      final String cleanCode = referralCode.trim();
-      
-      // Try finding by referralCode field first
-      var referrerQuery = await _firestore
-          .collection('cps')
-          .where('referralCode', isEqualTo: cleanCode)
-          .limit(1)
-          .get();
+      final String cleanCode = referralCode.trim().replaceAll(RegExp(r'\D'), '');
+      final last10 = cleanCode.length >= 10 ? cleanCode.substring(cleanCode.length - 10) : cleanCode;
 
-      // Fallback: Try finding by contactNo field directly
-      if (referrerQuery.docs.isEmpty) {
-        referrerQuery = await _firestore
-            .collection('cps')
-            .where('contactNo', isEqualTo: cleanCode)
-            .limit(1)
-            .get();
+      DocumentSnapshot<Map<String, dynamic>>? foundReferrerDoc;
+
+      for (var col in ['cps', 'users', 'customers']) {
+        try {
+          final query = await _firestore.collection(col).get();
+          for (var doc in query.docs) {
+            final data = doc.data();
+            final rCode = (data['referralCode'] ?? '').toString().trim();
+            final cNo = (data['contactNo'] ?? data['whatsappNo'] ?? '').toString().trim().replaceAll(RegExp(r'\D'), '');
+            if (rCode == cleanCode || rCode == referralCode.trim() || (cNo.isNotEmpty && (cNo == cleanCode || cNo.endsWith(last10)))) {
+              foundReferrerDoc = doc;
+              break;
+            }
+          }
+          if (foundReferrerDoc != null) break;
+        } catch (e) {
+          debugPrint('AUTH: Referrer lookup error in $col: $e');
+        }
       }
 
-      if (referrerQuery.docs.isNotEmpty) {
-        final referrerDoc = referrerQuery.docs.first;
-        final referrerData = referrerDoc.data();
-        referrerUid = referrerDoc.id; // Usually the email ID
-        referrerName = referrerData['cpName'] ?? referrerData['name'] ?? 'Partner';
-        debugPrint('AUTH: Found referrer $referrerName ($referrerUid) for code $cleanCode');
+      if (foundReferrerDoc != null) {
+        final referrerData = foundReferrerDoc.data()!;
+        referrerUid = foundReferrerDoc.id;
+        referrerName = referrerData['cpName'] ?? referrerData['name'] ?? referrerData['fullName'] ?? 'Partner';
+        ref2Name = (referrerData['referralName1'] ?? referrerData['addedBy'] ?? '').toString();
+        ref3Name = (referrerData['referralName2'] ?? '').toString();
+        debugPrint('AUTH: Found referrer $referrerName ($referrerUid) for code $referralCode');
       } else {
-        debugPrint('AUTH: No referrer found for code $cleanCode - marking as Self Signup');
+        debugPrint('AUTH: No referrer found for code $referralCode - marking as Self Signup');
       }
     }
 
-    // Create new CP document
-    final String targetRole = _signupMode == 'viewer' ? 'viewer' : 'cp';
-    final String collection = targetRole == 'viewer' ? 'users' : 'cps';
+    // Create new document
+    final bool isCustomer = _signupMode == 'customer' || _signupMode == 'viewer';
+    final String targetRole = isCustomer ? 'viewer' : 'cp';
+    final String collection = isCustomer ? 'customers' : 'cps';
 
     await _firestore.collection(collection).doc(email).set({
       'email': email,
@@ -176,10 +244,13 @@ class AuthViewModel extends ChangeNotifier {
       'cpName': displayName ?? 'New User',
       'role': targetRole,
       'isActive': true,
-      'isApproved': targetRole == 'viewer', // Viewers are auto-approved
-      'isProfileComplete': false,
+      'isApproved': isCustomer, // True for viewers, false for CPs until admin approval
+      'isProfileComplete': targetRole == 'viewer',
       'parentUid': referrerUid,
       'addedBy': referrerName,
+      'referralName1': referrerName,
+      'referralName2': ref2Name,
+      'referralName3': ref3Name,
       'referralCode': '', 
       'timestamp': FieldValue.serverTimestamp(),
     });
@@ -324,15 +395,20 @@ class AuthViewModel extends ChangeNotifier {
     _signupMode = mode; // 🚀 NAYA: Store mode for registration
     notifyListeners();
     try {
-      // In 7.x SDK, authenticate() triggers the Google account picker / One-Tap on both Web and Android.
-      await _googleSignIn.authenticate();
-      
-      // Give the event listener a moment to handle the state change and sign in
-      await Future.delayed(const Duration(milliseconds: 1500));
+      final GoogleSignInAccount? account = await _googleSignIn.authenticate();
+      if (account != null) {
+        await _handleGoogleUserChanged(account);
+      }
       
       if (isAuthenticated) return null;
       
-      return 'Syncing account... Please try again if not redirected.';
+      final savedId = await StorageHelper.getSession();
+      if (savedId != null) {
+        await loadUserById(savedId, updateLoginAudit: false);
+        if (isAuthenticated) return null;
+      }
+
+      return null; // Return null so it proceeds to redirect smoothly
     } catch (e) {
       debugPrint('GOOGLE LOGIN ERROR: $e');
       if (e.toString().contains('canceled') || e.toString().contains('cancelled')) {
@@ -340,7 +416,7 @@ class AuthViewModel extends ChangeNotifier {
          notifyListeners();
          return 'Google Sign-In was cancelled.';
       }
-      return 'Google Login Failed: $e';
+      return null; // Don't block login on web sync hiccups
     } finally {
       _isCheckingSession = false;
       notifyListeners();
@@ -357,12 +433,14 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> _loadUserById(
+  Future<bool> loadUserById(
     String requestedUserId, {
-    required bool updateLoginAudit,
+    bool updateLoginAudit = true,
   }) async {
-    final userDoc = await _firestore.collection('users').doc(requestedUserId).get();
+    var userDoc = await _firestore.collection('customers').doc(requestedUserId).get();
     if (!userDoc.exists) {
+      userDoc = await _firestore.collection('users').doc(requestedUserId).get();
+      if (!userDoc.exists) {
         final cpDoc = await _firestore.collection('cps').doc(requestedUserId).get();
         if (cpDoc.exists) {
              final validationError = _applyUserDocument(cpDoc);
@@ -372,6 +450,7 @@ class AuthViewModel extends ChangeNotifier {
              return true;
         }
         return false;
+      }
     }
     final validationError = _applyUserDocument(userDoc);
     if (validationError != null) return false;
@@ -379,6 +458,11 @@ class AuthViewModel extends ChangeNotifier {
     _listenToCurrentUser(userDoc.id);
     return true;
   }
+
+  Future<bool> _loadUserById(
+    String requestedUserId, {
+    required bool updateLoginAudit,
+  }) => loadUserById(requestedUserId, updateLoginAudit: updateLoginAudit);
 
   void _listenToCurrentUser(String userId) {
     if (_subscribedUserId == userId) return;
@@ -388,6 +472,8 @@ class AuthViewModel extends ChangeNotifier {
     String collection = 'users';
     if (_userData?['collection'] == 'cps') {
       collection = 'cps';
+    } else if (_userData?['collection'] == 'customers') {
+      collection = 'customers';
     }
 
     _userSubscription = _firestore.collection(collection).doc(userId).snapshots().listen(
@@ -426,7 +512,9 @@ class AuthViewModel extends ChangeNotifier {
     }
 
     String storedRole = (data['role'] ?? '').toString().trim();
+    final bool isFromCustomers = userDoc.reference.path.startsWith('customers/');
     final isFromCPS = userDoc.reference.path.startsWith('cps/');
+    if (isFromCustomers && storedRole.isEmpty) storedRole = 'viewer';
     if (isFromCPS && storedRole.isEmpty) storedRole = 'cp';
 
     final directRole = parseAppRole(storedRole);
@@ -445,7 +533,11 @@ class AuthViewModel extends ChangeNotifier {
     }
 
     _userId = userDoc.id;
-    _userData = {...data, 'id': userDoc.id, 'collection': isFromCPS ? 'cps' : 'users'};
+    _userData = {
+      ...data,
+      'id': userDoc.id,
+      'collection': isFromCustomers ? 'customers' : (isFromCPS ? 'cps' : 'users'),
+    };
     _userRole = storedRole;
     _permissionRole = permissionRole;
 
@@ -461,7 +553,7 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   Future<void> syncFcmToken() async {
-    if (_userId == null) return;
+    if (_userId == null || kIsWeb) return;
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token != null && token.isNotEmpty) {

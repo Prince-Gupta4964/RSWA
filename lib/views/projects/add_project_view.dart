@@ -18,6 +18,7 @@ import '../../viewmodels/app_configuration_viewmodel.dart';
 import '../../utils/project_form_config.dart';
 import '../../utils/role_permissions.dart';
 import '../../services/firebase_storage_service.dart';
+import '../../services/youtube_upload_service.dart';
 
 class AddProjectView extends StatefulWidget {
   final ProjectModel? project;
@@ -39,8 +40,11 @@ class _AddProjectViewState extends State<AddProjectView> {
 
   final Map<String, List<dynamic>> _pickedMediaLists = {}; 
   final Map<String, dynamic> _pickedFiles = {}; 
+  final List<Map<String, dynamic>> _customAttachmentRows = []; // 🚀 NAYA: Dynamic "Others" Attachments
 
-  final List<String> _expandedSections = ['Basic Info'];
+  final List<String> _expandedSections = [
+    ProjectFormStrings.sectionBasicInfo,
+  ];
   String _currentFocusedId = '';
   bool _isSaving = false;
   String _loadingMessage = '';
@@ -55,6 +59,18 @@ class _AddProjectViewState extends State<AddProjectView> {
   @override
   void initState() {
     super.initState();
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    if (authVM.appRole == AppRole.cp && !authVM.isApproved) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Your account is pending admin approval.'), backgroundColor: Colors.red),
+          );
+          context.go('/dashboard');
+        }
+      });
+      return;
+    }
 
     if (widget.project != null) {
       _formData.addAll(widget.project!.rawData);
@@ -78,6 +94,29 @@ class _AddProjectViewState extends State<AddProjectView> {
     _formData['adminRating'] = int.tryParse(_formData['adminRating']?.toString() ?? '0') ?? 0;
     _formData['peopleRating'] = int.tryParse(_formData['peopleRating']?.toString() ?? '0') ?? 0;
     _selectedBuilderIds = List<String>.from(_formData['builderIds'] ?? []);
+
+    // 🚀 NAYA: Initialize custom attachments
+    if (_formData['otherAttachments'] is List) {
+      final list = _formData['otherAttachments'] as List;
+      for (var item in list) {
+        if (item is Map) {
+          final title = (item['title'] ?? '').toString();
+          final url = (item['url'] ?? item['file'] ?? '').toString();
+          _customAttachmentRows.add({
+            'titleCtrl': TextEditingController(text: title),
+            'file': null,
+            'existingUrl': url.isNotEmpty ? url : null,
+          });
+        }
+      }
+    }
+    if (_customAttachmentRows.isEmpty) {
+      _customAttachmentRows.add({
+        'titleCtrl': TextEditingController(),
+        'file': null,
+        'existingUrl': null,
+      });
+    }
 
     _initializeAllControllers(_formData);
 
@@ -149,6 +188,11 @@ class _AddProjectViewState extends State<AddProjectView> {
   void dispose() {
     for (var ctrl in _controllers.values) ctrl.dispose();
     for (var node in _focusNodes.values) node.dispose();
+    for (var row in _customAttachmentRows) {
+      if (row['titleCtrl'] is TextEditingController) {
+        (row['titleCtrl'] as TextEditingController).dispose();
+      }
+    }
     _scrollController.dispose();
     super.dispose();
   }
@@ -352,19 +396,57 @@ class _AddProjectViewState extends State<AddProjectView> {
     }
   }
 
+  bool get _isFormUnlocked {
+    final bool hasPropertyType = _formData['propertyType'] != null && _formData['propertyType'].toString().isNotEmpty;
+    final bool hasSubType = _formData['subType'] != null && _formData['subType'].toString().isNotEmpty;
+    final String pType = (_formData['propertyType'] ?? '').toString();
+    final dynamic configVal = _formData['configuration'];
+    final bool hasConfiguration = configVal != null && (configVal is List ? configVal.isNotEmpty : configVal.toString().trim().isNotEmpty);
+
+    if (!hasPropertyType || !hasSubType) return false;
+
+    // Land or Shop: unlocked when subType is selected
+    if (pType == 'Land' || pType == 'Shop') {
+      return true;
+    }
+
+    // Project, Bungalow, or Flat: unlocked when configuration is selected
+    if (pType == 'Project' || pType == 'Bungalow' || pType == 'Flat') {
+      return hasConfiguration;
+    }
+
+    return true;
+  }
+
   bool _isFieldVisible(String fieldId) {
     final bool hasPropertyType = _formData['propertyType'] != null && _formData['propertyType'].toString().isNotEmpty;
     final bool hasSubType = _formData['subType'] != null && _formData['subType'].toString().isNotEmpty;
-    
-    // 🚀 NAYA: Tiered Gatekeeper
-    // Stage 1: Always visible
-    if (fieldId == 'images' || fieldId == 'propertyType') return true;
-    
-    // Stage 2: Visible only if Type is selected
-    if (fieldId == 'subType') return hasPropertyType;
-    
-    // Stage 3: Visible only if BOTH Type and Sub Type are selected
-    if (!hasPropertyType || !hasSubType) return false;
+    final String pType = (_formData['propertyType'] ?? '').toString();
+
+    // Stage 1: Photos/Media and Property Type are ALWAYS visible by default from the start
+    if (fieldId == 'coverImage' ||
+        fieldId == 'images' ||
+        fieldId == 'highlightsImages' ||
+        fieldId == 'outdoorsImages' ||
+        fieldId == 'projectVideo' ||
+        fieldId == 'propertyType') {
+      return true;
+    }
+
+    // Stage 2: Sub Type is visible only if Property Type is selected
+    if (fieldId == 'subType') {
+      return hasPropertyType;
+    }
+
+    // Stage 3: Configuration is visible if Property Type is Project, Flat, or Bungalow AND Sub Type is selected
+    if (fieldId == 'configuration') {
+      return (pType == 'Project' || pType == 'Flat' || pType == 'Bungalow') && hasSubType;
+    }
+
+    // Stage 4: All other fields inside Basic Info & other sections appear ONLY WHEN form is unlocked
+    if (!_isFormUnlocked) {
+      return false;
+    }
 
     Map<String, dynamic>? config;
     for (var section in ProjectFormStrings.formStructure) {
@@ -467,9 +549,11 @@ class _AddProjectViewState extends State<AddProjectView> {
 
     if (id == 'subType') {
       final pType = _formData['propertyType']?.toString() ?? '';
-      if (pType == 'Project') return ['Residential', 'Commercial', 'Bungalow', 'Redevelopment', 'Bulk'];
-      if (pType == 'Flat' || pType == 'Shop' || pType == 'Bungalow') return ['New', 'Resale'];
-      if (pType == 'Land') return ['NA', 'Non-NA'];
+      if (pType == 'Land') {
+        return ['NA', 'Non - NA'];
+      } else {
+        return ['New', 'UC', 'Resale', 'Rent', 'RTM'];
+      }
     }
 
     return learnedData.toList()..sort();
@@ -498,6 +582,18 @@ class _AddProjectViewState extends State<AddProjectView> {
     return names.toList()..sort();
   }
 
+  void _navigateBackOnCancelOrSave({String? targetDocId}) {
+    if (widget.project != null || targetDocId != null) {
+      final docId = targetDocId ?? widget.project!.id;
+      final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+      final updatedProject = projectVM.projects.where((p) => p.id == docId).firstOrNull ?? widget.project;
+      
+      context.go('/project-detail/$docId', extra: updatedProject);
+    } else {
+      context.go('/projects');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.project != null;
@@ -506,14 +602,14 @@ class _AddProjectViewState extends State<AddProjectView> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        context.go('/projects');
+        _navigateBackOnCancelOrSave();
       },
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
-          leading: IconButton(onPressed: () => context.go('/projects'), icon: const Icon(Icons.arrow_back, color: Colors.black)),
+          leading: IconButton(onPressed: _navigateBackOnCancelOrSave, icon: const Icon(Icons.arrow_back, color: Colors.black)),
           title: Text(isEditing ? 'Edit Project' : 'New Project Form', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
         ),
         body: Column(
@@ -537,8 +633,8 @@ class _AddProjectViewState extends State<AddProjectView> {
     final bool hasPropertyType = _formData['propertyType'] != null && _formData['propertyType'].toString().isNotEmpty;
     final bool hasSubType = _formData['subType'] != null && _formData['subType'].toString().isNotEmpty;
 
-    // 🚀 NAYA: Hide other sections until BOTH Type and Sub Type are selected
-    if (title != ProjectFormStrings.sectionBasicInfo && (!hasPropertyType || !hasSubType)) {
+    // 🚀 NAYA: Hide other sections until form is unlocked
+    if (title != ProjectFormStrings.sectionBasicInfo && !_isFormUnlocked) {
       return const SizedBox.shrink();
     }
 
@@ -581,7 +677,7 @@ class _AddProjectViewState extends State<AddProjectView> {
           onDoubleTap: _globalToggle,
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: isExpanded ? primaryColor.withValues(alpha: 0.1) : primaryColor.withValues(alpha: 0.05),
               border: Border(
@@ -627,7 +723,16 @@ class _AddProjectViewState extends State<AddProjectView> {
     }
 
     if (field.containsKey('id') && field['id'] != null) {
-      if (!_isFieldVisible(field['id'])) return const SizedBox.shrink();
+      final String id = field['id'];
+      if (!_isFieldVisible(id)) return const SizedBox.shrink();
+
+      // 🚀 NAYA: 2x2 Grid + Video Container for Media Categories
+      if (id == 'coverImage') {
+        return _buildImageMediaGrid();
+      }
+      if (id == 'images' || id == 'highlightsImages' || id == 'outdoorsImages' || id == 'projectVideo') {
+        return const SizedBox.shrink(); // Rendered together in media grid
+      }
     }
 
     final String type = field['type'];
@@ -686,12 +791,10 @@ class _AddProjectViewState extends State<AddProjectView> {
       if (pType.isEmpty) return const SizedBox.shrink();
 
       List<String> dynamicOptions = [];
-      if (pType == 'Project') {
-        dynamicOptions = ['Residential', 'Commercial', 'Bungalow', 'Redevelopment', 'Bulk'];
-      } else if (pType == 'Flat' || pType == 'Shop' || pType == 'Bungalow') {
-        dynamicOptions = ['New', 'Resale'];
-      } else if (pType == 'Land') {
-        dynamicOptions = ['NA', 'Non-NA'];
+      if (pType == 'Land') {
+        dynamicOptions = ['NA', 'Non - NA'];
+      } else {
+        dynamicOptions = ['New', 'UC', 'Resale', 'Rent', 'RTM'];
       }
       return _buildChoiceChips(label, id, dynamicOptions);
     }
@@ -707,6 +810,7 @@ class _AddProjectViewState extends State<AddProjectView> {
     }
 
     switch (type) {
+      case 'custom_attachment_list': return _buildCustomAttachmentList(label, id);
       case 'media_list': return _buildMediaList(label, id);
       case 'chips': return _buildChoiceChips(label, id, configVM.getOptionsForField('Project Form', id, List<String>.from(field['options'] ?? [])));
       case 'addable_chips': return _buildAddableChips(label, id, configVM.getOptionsForField('Project Form', id, List<String>.from(field['options'] ?? [])));
@@ -721,6 +825,464 @@ class _AddProjectViewState extends State<AddProjectView> {
       case 'like': return _buildLikeField(label, id);
       default: return _buildSearchableField(label, id, readOnly: field['readOnly'] ?? false);
     }
+  }
+
+  Widget _buildCustomAttachmentList(String label, String id) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Colors.black87)),
+        const SizedBox(height: 10),
+        ..._customAttachmentRows.asMap().entries.map((entry) {
+          final int index = entry.key;
+          final row = entry.value;
+          final TextEditingController titleCtrl = row['titleCtrl'] as TextEditingController;
+          final dynamic pickedFile = row['file'];
+          final String? existingUrl = row['existingUrl'];
+
+          String fileName = 'No file selected';
+          if (pickedFile != null) {
+            fileName = (pickedFile is XFile) ? pickedFile.name : (pickedFile is PlatformFile ? pickedFile.name : 'Selected File');
+          } else if (existingUrl != null && existingUrl.isNotEmpty) {
+            fileName = 'Uploaded File (${index + 1})';
+          }
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Attachment #${index + 1}',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+                    ),
+                    const Spacer(),
+                    if (_customAttachmentRows.length > 1)
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            titleCtrl.dispose();
+                            _customAttachmentRows.removeAt(index);
+                          });
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.all(2.0),
+                          child: Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left 50%: Document Title Input
+                    Expanded(
+                      child: TextField(
+                        controller: titleCtrl,
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: 'e.g. Tax Receipt, Draft',
+                          labelText: 'Document Title',
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+
+                    // Right 50%: Image/File Picker
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final FilePickerResult? result = await FilePicker.platform.pickFiles(
+                            type: FileType.custom,
+                            allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+                          );
+                          if (result != null && result.files.isNotEmpty) {
+                            setState(() {
+                              row['file'] = result.files.first;
+                            });
+                          }
+                        },
+                        child: Container(
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: (pickedFile != null || existingUrl != null) ? const Color(0xFFFF6B22) : Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                (pickedFile != null || existingUrl != null) ? Icons.check_circle_rounded : Icons.file_upload_outlined,
+                                color: (pickedFile != null || existingUrl != null) ? const Color(0xFFFF6B22) : Colors.grey.shade600,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  fileName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: (pickedFile != null || existingUrl != null) ? FontWeight.bold : FontWeight.normal,
+                                    color: (pickedFile != null || existingUrl != null) ? Colors.black87 : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }),
+        const SizedBox(height: 4),
+
+        // + Add More Attachment Button
+        OutlinedButton.icon(
+          onPressed: () {
+            setState(() {
+              _customAttachmentRows.add({
+                'titleCtrl': TextEditingController(),
+                'file': null,
+                'existingUrl': null,
+              });
+            });
+          },
+          icon: const Icon(Icons.add_rounded, size: 18, color: Color(0xFFFF6B22)),
+          label: const Text('Add More Attachment', style: TextStyle(color: Color(0xFFFF6B22), fontWeight: FontWeight.bold, fontSize: 12.5)),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Color(0xFFFF6B22), width: 1.2),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageMediaGrid() {
+    final Map<String, String> mediaFields = {
+      'coverImage': 'Cover Image',
+      'images': 'Images Max 10',
+      'highlightsImages': 'Highlights Max 10',
+      'outdoorsImages': 'Outdoors Max 10',
+    };
+
+    final List<MapEntry<String, String>> entries = mediaFields.entries.toList();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Project Photos & Media', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Colors.black87)),
+          const SizedBox(height: 6),
+          // 1. 2x2 Grid for All 4 Image Categories
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 4,
+              mainAxisExtent: 115,
+            ),
+            itemCount: entries.length,
+            itemBuilder: (context, index) {
+              final fieldId = entries[index].key;
+              final fieldLabel = entries[index].value;
+              return _buildGridImageCard(fieldId, fieldLabel);
+            },
+          ),
+          const SizedBox(height: 8),
+          // 2. Project Video Container at the bottom
+          _buildVideoContainerCard('projectVideo', 'Project Video (File / Link)'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVideoContainerCard(String id, String label) {
+    dynamic pickedVideo = _pickedFiles[id];
+    String? existingUrl = _formData[id] is String && _formData[id].toString().isNotEmpty ? _formData[id] as String : null;
+
+    bool hasVideo = pickedVideo != null || existingUrl != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.black87)),
+            const Spacer(),
+            if (hasVideo)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                child: const Text('Video Added', style: TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        if (hasVideo)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.video_collection_rounded, color: Colors.blue.shade700, size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    existingUrl ?? (pickedVideo is PlatformFile ? pickedVideo.name : (pickedVideo is XFile ? pickedVideo.name : 'Selected Video File')),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.black87),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.redAccent, size: 16),
+                  onPressed: () => setState(() {
+                    _pickedFiles.remove(id);
+                    _formData.remove(id);
+                  }),
+                ),
+              ],
+            ),
+          )
+        else
+          InkWell(
+            onTap: () async {
+              final FilePickerResult? result = await FilePicker.platform.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: ['mp4', 'mov', 'avi', 'mkv', 'pdf'],
+              );
+              if (result != null && result.files.isNotEmpty) {
+                final file = result.files.first;
+                setState(() => _pickedFiles[id] = file);
+              }
+            },
+            child: Container(
+              height: 52,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey.shade300, width: 1, style: BorderStyle.solid),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.video_call_outlined, color: Colors.blue.shade600, size: 22),
+                  const SizedBox(width: 6),
+                  Text('Upload Project Video File', style: TextStyle(color: Colors.blue.shade700, fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildGridImageCard(String id, String label) {
+    bool isSingle = id == 'coverImage';
+    
+    dynamic singlePicked = _pickedFiles[id];
+    String? singleExisting = _formData[id] is String && _formData[id].toString().startsWith('http') ? _formData[id] as String : null;
+
+    List<dynamic> multiPicked = _pickedMediaLists[id] ?? [];
+    List<dynamic> multiExisting = (_formData[id] is List) ? _formData[id] as List<dynamic> : [];
+
+    int totalCount = isSingle 
+        ? (singlePicked != null || singleExisting != null ? 1 : 0)
+        : (multiPicked.length + multiExisting.length);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.black87),
+              ),
+            ),
+            if (totalCount > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(color: const Color(0xFFFF6B22).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                child: Text('$totalCount', style: const TextStyle(color: Color(0xFFFF6B22), fontSize: 10, fontWeight: FontWeight.bold)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Center(
+          child: isSingle
+              ? _buildSingleImageGridTile(id, singlePicked, singleExisting)
+              : _buildMultiImageGridTile(id, multiPicked, multiExisting),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSingleImageGridTile(String id, dynamic picked, String? existingUrl) {
+    if (picked != null || existingUrl != null) {
+      return Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: existingUrl != null
+                ? Image.network(existingUrl, width: 75, height: 75, fit: BoxFit.cover)
+                : (kIsWeb
+                    ? Image.network((picked as XFile).path, width: 75, height: 75, fit: BoxFit.cover)
+                    : Image.file(File((picked as XFile).path), width: 75, height: 75, fit: BoxFit.cover)),
+          ),
+          Positioned(
+            top: 2,
+            right: 2,
+            child: InkWell(
+              onTap: () => setState(() {
+                _pickedFiles.remove(id);
+                _formData.remove(id);
+              }),
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                child: const Icon(Icons.close, color: Colors.white, size: 14),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return InkWell(
+      onTap: () async {
+        final ImagePicker picker = ImagePicker();
+        final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70, maxWidth: 1280, maxHeight: 1280);
+        if (pickedFile != null) setState(() => _pickedFiles[id] = pickedFile);
+      },
+      child: Container(
+        width: 75,
+        height: 75,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade300, width: 1, style: BorderStyle.solid),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_a_photo_outlined, color: Colors.grey.shade400, size: 22),
+            const SizedBox(height: 2),
+            Text('Add Photo', style: TextStyle(color: Colors.grey.shade500, fontSize: 9.5, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMultiImageGridTile(String id, List<dynamic> multiPicked, List<dynamic> multiExisting) {
+    final allItems = [
+      ...multiExisting.map((url) => _buildThumbnail(url, () {
+        setState(() {
+          final updatedList = List<dynamic>.from(multiExisting);
+          updatedList.remove(url);
+          _formData[id] = updatedList;
+        });
+      }, isUrl: true)),
+      ...multiPicked.map((file) => _buildThumbnail(file, () => setState(() => multiPicked.remove(file)))),
+    ];
+
+    if (allItems.isNotEmpty) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            ...allItems,
+            if (allItems.length < 10)
+              InkWell(
+                onTap: () async {
+                  final ImagePicker picker = ImagePicker();
+                  final picked = await picker.pickMultiImage(imageQuality: 70, maxWidth: 1280, maxHeight: 1280);
+                  if (picked.isNotEmpty) setState(() => _pickedMediaLists.putIfAbsent(id, () => []).addAll(picked));
+                },
+                child: Container(
+                  width: 75,
+                  height: 75,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade300, width: 1),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add_a_photo_outlined, color: Colors.grey.shade400, size: 22),
+                      const SizedBox(height: 2),
+                      Text('Add', style: TextStyle(color: Colors.grey.shade500, fontSize: 10, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return InkWell(
+      onTap: () async {
+        final ImagePicker picker = ImagePicker();
+        final picked = await picker.pickMultiImage(imageQuality: 70, maxWidth: 1280, maxHeight: 1280);
+        if (picked.isNotEmpty) setState(() => _pickedMediaLists.putIfAbsent(id, () => []).addAll(picked));
+      },
+      child: Container(
+        width: 75,
+        height: 75,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade300, width: 1, style: BorderStyle.solid),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_a_photo_outlined, color: Colors.grey.shade400, size: 22),
+            const SizedBox(height: 2),
+            Text('Add Photo', style: TextStyle(color: Colors.grey.shade500, fontSize: 9.5, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildMediaList(String label, String id) {
@@ -783,28 +1345,29 @@ class _AddProjectViewState extends State<AddProjectView> {
   }
 
   Widget _buildThumbnail(dynamic file, VoidCallback onRemove, {bool isUrl = false}) {
-    return SizedBox(
-      width: 140,
-      height: 140,
+    return Container(
+      width: 75,
+      height: 75,
+      margin: const EdgeInsets.only(right: 8),
       child: Stack(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             child: isUrl 
-              ? Image.network(file, fit: BoxFit.cover, width: 140, height: 140)
-              : (kIsWeb ? Image.network(file.path, fit: BoxFit.cover, width: 140, height: 140) : Image.file(File(file.path), fit: BoxFit.cover, width: 140, height: 140)),
+              ? Image.network(file, fit: BoxFit.cover, width: 75, height: 75)
+              : (kIsWeb ? Image.network(file.path, fit: BoxFit.cover, width: 75, height: 75) : Image.file(File(file.path), fit: BoxFit.cover, width: 75, height: 75)),
           ),
           Positioned(
-            top: 4, 
-            right: 4, 
+            top: 2, 
+            right: 2, 
             child: GestureDetector(
               onTap: onRemove, 
               child: Container(
-                padding: const EdgeInsets.all(4), 
+                padding: const EdgeInsets.all(3), 
                 decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle), 
-                child: const Icon(Icons.close, color: Colors.white, size: 18)
-              )
-            )
+                child: const Icon(Icons.close, color: Colors.white, size: 14),
+              ),
+            ),
           ),
         ],
       ),
@@ -1786,10 +2349,14 @@ class _AddProjectViewState extends State<AddProjectView> {
       children: [
         Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.start,
+            crossAxisAlignment: WrapCrossAlignment.start,
+            children: [
             ...defaultOptions.map((o) {
               final isSel = selected.contains(o);
               return FilterChip(
@@ -1825,7 +2392,8 @@ class _AddProjectViewState extends State<AddProjectView> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+      ),
+      const SizedBox(height: 12),
       ],
     );
   }
@@ -1993,7 +2561,7 @@ class _AddProjectViewState extends State<AddProjectView> {
       'buildingName',
       'areaName',
       'buildersOwnerName',
-      'googleLocation',
+      'location',
     ];
 
     // 🚀 Only collect text values for text-based inputs and auto-apply Title Case formatting
@@ -2048,6 +2616,40 @@ class _AddProjectViewState extends State<AddProjectView> {
         setState(() {
           _loadingMessage = 'Uploading $fieldId...';
         });
+
+        if (fieldId == 'projectVideo') {
+          Uint8List? videoBytes;
+          if (entry.value is XFile) {
+            videoBytes = await (entry.value as XFile).readAsBytes();
+          } else if (entry.value is PlatformFile) {
+            videoBytes = (entry.value as PlatformFile).bytes;
+          }
+
+          if (videoBytes != null) {
+            setState(() {
+              _loadingMessage = 'Uploading video to YouTube...';
+            });
+            final youtubeUrl = await YouTubeUploadService.uploadVideoBytes(
+              videoBytes: videoBytes,
+              title: _formData['propertyName']?.toString() ?? 'Project Video',
+              description: 'Project Video uploaded via Property+ App',
+              googleUser: authVM.lastGoogleUser,
+            );
+            if (youtubeUrl != null) {
+              _formData[fieldId] = youtubeUrl;
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Video successfully published to YouTube!'), backgroundColor: Colors.green),
+                );
+              }
+              continue;
+            } else {
+              throw 'YouTube video upload failed. Please check YouTube API quota or credentials.';
+            }
+          }
+          continue;
+        }
+
         String fileName = (entry.value is XFile) ? (entry.value as XFile).name : (entry.value as PlatformFile).name;
         final String ext = fileName.split('.').last;
         final String path = 'projects/$folderName/$fieldId.$ext';
@@ -2090,6 +2692,18 @@ class _AddProjectViewState extends State<AddProjectView> {
       }
 
       _formData['builderIds'] = _selectedBuilderIds;
+
+      // 🚀 NAYA: Save initial existing custom attachments
+      final List<Map<String, String>> initialCustomAttachments = [];
+      for (var row in _customAttachmentRows) {
+        final String title = (row['titleCtrl'] as TextEditingController).text.trim();
+        final String? existingUrl = row['existingUrl'];
+        if (title.isNotEmpty && existingUrl != null && existingUrl.isNotEmpty && row['file'] == null) {
+          initialCustomAttachments.add({'title': title, 'url': existingUrl});
+        }
+      }
+      _formData['otherAttachments'] = initialCustomAttachments;
+
       final String projName = _formData['propertyName'] ?? 'New Project';
       final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
 
@@ -2110,8 +2724,8 @@ class _AddProjectViewState extends State<AddProjectView> {
         actorRole: authVM.roleLabel,
       );
 
-      final String hasMediaToUpload = (_pickedMediaLists.values.any((l) => l.isNotEmpty) || _pickedFiles.values.any((f) => f != null))
-          ? ' Photos uploading in background...'
+      final String hasMediaToUpload = (_pickedMediaLists.values.any((l) => l.isNotEmpty) || _pickedFiles.values.any((f) => f != null) || _customAttachmentRows.any((r) => r['file'] != null))
+          ? ' Files uploading in background...'
           : '';
 
       if (mounted) {
@@ -2122,11 +2736,11 @@ class _AddProjectViewState extends State<AddProjectView> {
             duration: const Duration(seconds: 3),
           ),
         );
-        context.go('/projects');
+        _navigateBackOnCancelOrSave(targetDocId: widget.project?.id ?? _toTitleCase(projName));
       }
 
       // Background Async Upload
-      _uploadProjectMediaInBackground(projName, Map.from(_pickedMediaLists), Map.from(_pickedFiles), folderName);
+      _uploadProjectMediaInBackground(projName, Map.from(_pickedMediaLists), Map.from(_pickedFiles), List.from(_customAttachmentRows), folderName);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
@@ -2138,6 +2752,7 @@ class _AddProjectViewState extends State<AddProjectView> {
     String projectName,
     Map<String, List<dynamic>> pickedMediaLists,
     Map<String, dynamic> pickedFiles,
+    List<Map<String, dynamic>> customAttachmentRows,
     String folderName,
   ) async {
     final db = FirebaseFirestore.instance;
@@ -2188,6 +2803,34 @@ class _AddProjectViewState extends State<AddProjectView> {
               'propertyDetails': details,
               fieldId: url,
             });
+          }
+        }
+      }
+
+      // 🚀 Upload Custom Attachments ("Others")
+      for (int i = 0; i < customAttachmentRows.length; i++) {
+        final row = customAttachmentRows[i];
+        final String title = (row['titleCtrl'] as TextEditingController).text.trim();
+        final dynamic file = row['file'];
+
+        if (file != null) {
+          String fileName = (file is XFile) ? file.name : (file as PlatformFile).name;
+          final String ext = fileName.split('.').last;
+          final String path = 'projects/$folderName/others_${DateTime.now().millisecondsSinceEpoch}_$i.$ext';
+          final String? url = await FirebaseStorageService.uploadFile(file, path);
+          if (url != null) {
+            final docSnap = await db.collection('projects').doc(sanitizeId).get();
+            if (docSnap.exists) {
+              final data = docSnap.data() ?? {};
+              final details = Map<String, dynamic>.from(data['propertyDetails'] ?? {});
+              List<dynamic> currentAttachments = List<dynamic>.from(details['otherAttachments'] is List ? details['otherAttachments'] : []);
+              currentAttachments.add({'title': title.isNotEmpty ? title : 'Attachment ${i + 1}', 'url': url});
+              details['otherAttachments'] = currentAttachments;
+              await db.collection('projects').doc(sanitizeId).update({
+                'propertyDetails': details,
+                'otherAttachments': currentAttachments,
+              });
+            }
           }
         }
       }

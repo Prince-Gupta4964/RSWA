@@ -25,14 +25,46 @@ class CPViewModel extends ChangeNotifier {
   }
 
   void fetchCPs() {
-    _db.collection('cps').orderBy('timestamp', descending: true).snapshots().listen((snapshot) {
-      _cps = snapshot.docs.map((doc) => CPModel.fromMap(doc.data(), doc.id)).toList();
+    List<CPModel> cpsList = [];
+    List<CPModel> customersList = [];
+
+    void updateCombined() {
+      final combined = [...cpsList, ...customersList];
+      combined.sort((a, b) {
+        final t1 = a.rawData['timestamp'];
+        final t2 = b.rawData['timestamp'];
+        if (t1 is Timestamp && t2 is Timestamp) {
+          return t2.compareTo(t1);
+        }
+        return 0;
+      });
+      _cps = combined;
       _isLoading = false;
       notifyListeners();
+    }
+
+    _db.collection('cps').snapshots().listen((snapshot) {
+      cpsList = snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['collection'] = 'cps';
+        return CPModel.fromMap(data, doc.id);
+      }).toList();
+      updateCombined();
     }, onError: (error) {
-      print("Firebase CP Fetch Error: $error");
-      _isLoading = false;
-      notifyListeners();
+      debugPrint("Firebase CP Fetch Error: $error");
+    });
+
+    _db.collection('customers').snapshots().listen((snapshot) {
+      customersList = snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['collection'] = 'customers';
+        data['role'] = data['role'] ?? 'viewer';
+        data['profession'] = data['profession'] ?? 'Customer';
+        return CPModel.fromMap(data, doc.id);
+      }).toList();
+      updateCombined();
+    }, onError: (error) {
+      debugPrint("Firebase Customer Fetch Error: $error");
     });
   }
 
@@ -76,18 +108,18 @@ class CPViewModel extends ChangeNotifier {
   }
 
   // --- TOGGLE FAVORITE CP ---
-  Future<void> toggleFavorite(String cpId, String userId, List<dynamic> currentFavs) async {
+  Future<void> toggleFavorite(String cpId, String userId, List<dynamic> currentFavs, {String collection = 'cps'}) async {
     final List<String> newFavs = List<String>.from(currentFavs);
     if (newFavs.contains(userId)) {
       newFavs.remove(userId);
     } else {
       newFavs.add(userId);
     }
-    await _db.collection('cps').doc(cpId).update({'favUids': newFavs});
+    await _db.collection(collection).doc(cpId).update({'favUids': newFavs});
   }
 
   // --- APPROVE CP ---
-  Future<void> approveCP(String cpId, Map<String, dynamic>? actorMetadata) async {
+  Future<void> approveCP(String cpId, Map<String, dynamic>? actorMetadata, {bool isCustomerUpgrade = false, String collection = 'cps'}) async {
     final Map<String, dynamic> updateData = {
       'isApproved': true,
       'status': 'Active Partner',
@@ -95,11 +127,17 @@ class CPViewModel extends ChangeNotifier {
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
+    if (isCustomerUpgrade) {
+      updateData['role'] = 'cp';
+      updateData['cpUpgradeRequested'] = false;
+      updateData['upgradeStatus'] = 'Approved';
+    }
+
     if (actorMetadata != null) {
       updateData['updatedBy'] = actorMetadata;
     }
 
-    await _db.collection('cps').doc(cpId).update(updateData);
+    await _db.collection(collection).doc(cpId).update(updateData);
   }
 
   // --- MOVE TO RECYCLE BIN (Optimized) ---

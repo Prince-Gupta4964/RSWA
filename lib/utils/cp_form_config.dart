@@ -26,13 +26,6 @@ class CPFormStrings {
     {
       "title": sectionBasicInfo,
       "fields": [
-        {
-          "type": "row",
-          "fields": [
-            {"id": "cpID", "label": "Partner ID", "type": "text", "readOnly": true},
-            {"id": "timestamp", "label": "Date Time", "type": "text", "readOnly": true},
-          ]
-        },
         {"id": "partnerType", "label": "Type", "type": "chips", "options": partnerTypes, "isRequired": true},
         {
           "type": "row",
@@ -46,9 +39,9 @@ class CPFormStrings {
         {"id": "contact2", "label": "Contact 2", "type": "phone"},
         {"id": "email", "label": "Email", "type": "text"},
         {"id": "source", "label": "Source", "type": "dropdown", "options": sources},
-        {"id": "referralName1", "label": "Referral Name 1 (3%)", "type": "text", "visibleIf": "source == Referral"},
-        {"id": "referralName2", "label": "Referral Name 2 (1%)", "type": "text", "readOnly": true},
-        {"id": "referralName3", "label": "Referral Name 3 (0.5%)", "type": "text", "readOnly": true},
+        {"id": "referralName1", "label": "Referral Name 1", "type": "text", "visibleIf": "source == Referral"},
+        {"id": "referralName2", "label": "Referral Name 2", "type": "text", "readOnly": true, "roles": ["admin", "super_admin"]},
+        {"id": "referralName3", "label": "Referral Name 3", "type": "text", "readOnly": true, "roles": ["admin", "super_admin"]},
         {"id": "nearestStation", "label": "Nearest Station", "type": "text"},
         {"id": "sendReferralLink", "label": "Send Referral Link", "type": "switch"},
       ]
@@ -58,7 +51,7 @@ class CPFormStrings {
       "fields": [
         {"id": "status", "label": "Status", "type": "chips", "options": statusTiers, "roles": ["admin", "super_admin"]},
         {"id": "tag", "label": "Tag", "type": "text", "roles": ["admin", "super_admin"]},
-        {"id": "nickName", "label": "Nick Name", "type": "text"},
+        {"id": "nickName", "label": "Nick Name", "type": "text", "roles": ["admin", "super_admin"]},
         {"id": "gender", "label": "Gender", "type": "chips", "options": ["Male", "Female", "Other"]},
         {"id": "address", "label": "Address", "type": "multiline"},
         {"id": "workLocation", "label": "Work Location", "type": "text"},

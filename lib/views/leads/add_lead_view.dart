@@ -51,6 +51,18 @@ class _AddLeadViewState extends State<AddLeadView> {
   @override
   void initState() {
     super.initState();
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    if (authVM.appRole == AppRole.cp && !authVM.isApproved) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Your account is pending admin approval.'), backgroundColor: Colors.red),
+          );
+          context.go('/dashboard');
+        }
+      });
+      return;
+    }
     _initializeData();
   }
 
@@ -528,7 +540,7 @@ class _AddLeadViewState extends State<AddLeadView> {
           onDoubleTap: _globalToggle,
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: isExpanded ? primaryColor.withValues(alpha: 0.1) : Colors.white,
               border: Border(bottom: BorderSide(color: Colors.grey.shade100)),

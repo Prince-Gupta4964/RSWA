@@ -128,8 +128,8 @@ class ProjectViewModel extends ChangeNotifier {
     final String targetDocId = _sanitizeDocId(projectName);
 
     if (id != null && id.isNotEmpty) {
+      // 🚀 EDIT MODE: Do NOT overwrite createdByUid or createdBy!
       if (id != targetDocId) {
-        // Project Name was changed, move document to new Project Name ID
         final oldDoc = await _db.collection('projects').doc(id).get();
         if (oldDoc.exists && oldDoc.data() != null) {
           final mergedData = {...oldDoc.data()!, ...data};
@@ -146,9 +146,10 @@ class ProjectViewModel extends ChangeNotifier {
           await _db.collection('projects').doc(targetDocId).set(data, SetOptions(merge: true));
         }
       } else {
-        await _db.collection('projects').doc(id).set(data, SetOptions(merge: true));
+        await _db.collection('projects').doc(id).update(data);
       }
     } else {
+      // 🚀 NEW PROJECT MODE: Set createdByUid and createdBy!
       data['createdByUid'] = actorUid;
       data['timestamp'] = FieldValue.serverTimestamp();
       data['createdBy'] = {
@@ -173,6 +174,43 @@ class ProjectViewModel extends ChangeNotifier {
         .doc(projectId)
         .collection('inventory')
         .add(inventoryData);
+  }
+
+  // 🚀 NAYA: Amazon-Style Project Rating Submission
+  Future<void> submitProjectRating(String projectId, String userId, int rating) async {
+    try {
+      final docRef = _db.collection('projects').doc(projectId);
+      final ratingRef = docRef.collection('ratings').doc(userId);
+
+      await _db.runTransaction((transaction) async {
+        transaction.set(ratingRef, {
+          'userId': userId,
+          'rating': rating,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      });
+
+      // Recalculate average and count from ratings subcollection
+      final ratingsSnapshot = await docRef.collection('ratings').get();
+      double total = 0;
+      int count = ratingsSnapshot.docs.length;
+
+      for (var doc in ratingsSnapshot.docs) {
+        final data = doc.data();
+        final r = double.tryParse(data['rating']?.toString() ?? '0') ?? 0.0;
+        total += r;
+      }
+
+      final double avg = count > 0 ? double.parse((total / count).toStringAsFixed(1)) : 0.0;
+
+      await docRef.update({
+        'avgRating': avg,
+        'ratingCount': count,
+      });
+    } catch (e) {
+      debugPrint("Error submitting rating: $e");
+      rethrow;
+    }
   }
 
   // --- MOVE TO RECYCLE BIN (Optimized) ---
@@ -277,5 +315,37 @@ class ProjectViewModel extends ChangeNotifier {
     }
 
     await docRef.update(updateData);
+  }
+
+  // --- NAYA FUNCTION: Toggle Project Favorite (Per User Persistence) ---
+  Future<void> toggleProjectFavorite(String projectId, String userId, List<String> currentFavUids) async {
+    if (userId.isEmpty || projectId.isEmpty) return;
+    
+    final List<String> updatedFavs = List<String>.from(currentFavUids);
+    if (updatedFavs.contains(userId)) {
+      updatedFavs.remove(userId);
+    } else {
+      updatedFavs.add(userId);
+    }
+
+    try {
+      final docRef = _db.collection('projects').doc(projectId);
+      final docSnapshot = await docRef.get();
+      Map<String, dynamic> propertyDetails = {};
+      if (docSnapshot.exists && docSnapshot.data() != null) {
+        final data = docSnapshot.data()!;
+        if (data['propertyDetails'] is Map) {
+          propertyDetails = Map<String, dynamic>.from(data['propertyDetails']);
+        }
+      }
+      propertyDetails['favUids'] = updatedFavs;
+
+      await docRef.update({
+        'favUids': updatedFavs,
+        'propertyDetails': propertyDetails,
+      });
+    } catch (e) {
+      debugPrint('Error toggling project favorite: $e');
+    }
   }
 }

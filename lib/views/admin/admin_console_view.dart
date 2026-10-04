@@ -879,6 +879,9 @@ Future<void> _showUserEditor(
   final passwordController = TextEditingController(
     text: existingUser?.password ?? '',
   );
+  final whatsappController = TextEditingController(
+    text: existingUser?.contactNo ?? '',
+  );
   final isSuperAdmin = authVM.appRole == AppRole.superAdmin;
   final roleOptions = roleDefinitions
       .where(
@@ -938,6 +941,12 @@ Future<void> _showUserEditor(
                   decoration: const InputDecoration(labelText: 'Password'),
                 ),
                 const SizedBox(height: 12),
+                TextField(
+                  controller: whatsappController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: 'WhatsApp Number'),
+                ),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<RoleDefinition>(
                   value: selectedRole,
                   decoration: const InputDecoration(labelText: 'Role'),
@@ -983,6 +992,7 @@ Future<void> _showUserEditor(
                         role: selectedRole.label,
                         baseRole: selectedRole.baseRole,
                         isActive: isActive,
+                        contactNo: whatsappController.text.trim(),
                       );
                       if (sheetContext.mounted) Navigator.pop(sheetContext);
                     } catch (error) {
@@ -1002,6 +1012,7 @@ Future<void> _showUserEditor(
     nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
+    whatsappController.dispose();
   }
 }
 

@@ -3,13 +3,18 @@ class ProjectFormStrings {
   static const String sectionLocation = 'Property Details';
   static const String sectionAmenities = 'Amenities';
   static const String sectionLegalDetails = 'Legal Details';
+  static const String sectionOthers = 'Others';
   static const String sectionAdminDetails = 'Admin Details';
 
   static const List<Map<String, dynamic>> formStructure = [
     {
       'title': sectionBasicInfo,
       'fields': [
-        {'id': 'images', 'label': 'Images (Max 10)', 'type': 'media_list'},
+        {'id': 'coverImage', 'label': 'Cover Image', 'type': 'file'},
+        {'id': 'images', 'label': 'Images Max 10', 'type': 'media_list'},
+        {'id': 'highlightsImages', 'label': 'Highlights Max 10', 'type': 'media_list'},
+        {'id': 'outdoorsImages', 'label': 'Outdoors Max 10', 'type': 'media_list'},
+        {'id': 'projectVideo', 'label': 'Project Video File / Link', 'type': 'file'},
         {
           'id': 'propertyType',
           'label': 'Property Type',
@@ -23,8 +28,23 @@ class ProjectFormStrings {
           'options': [], // Populated dynamically in UI
           'visibleIf': 'propertyType != '
         },
+        {
+          'id': 'configuration',
+          'label': 'Configuration',
+          'type': 'addable_chips',
+          'options': ['1 BHK', '2 BHK', '3 BHK', '4 BHK'],
+          'visibleIf': 'propertyType != Land && propertyType != Shop'
+        },
         {'id': 'propertyName', 'label': 'Property Name', 'type': 'searchable'},
         {'id': 'projectCompany', 'label': 'Project Company', 'type': 'searchable'},
+        {'id': 'plotCostLand', 'label': 'Plot Cost', 'type': 'number', 'visibleIf': 'propertyType == Land'},
+        {
+          'type': 'row',
+          'fields': [
+            {'id': 'totalAreaGuntha', 'label': 'Plot Size in Guntha', 'type': 'number', 'visibleIf': 'propertyType == Land'},
+            {'id': 'zone', 'label': 'Zone', 'type': 'text', 'visibleIf': 'propertyType == Land'},
+          ]
+        },
         {
           'id': 'builderSelection',
           'label': 'Select Builders',
@@ -55,7 +75,7 @@ class ProjectFormStrings {
     {
       'title': sectionLocation,
       'fields': [
-        {'id': 'startingPrice', 'label': 'Starting Price', 'type': 'searchable'},
+        {'id': 'possessionDate', 'label': 'Possession Date', 'type': 'date', 'visibleIf': 'propertyType != Land'},
         {
           'id': 'wing', 
           'label': 'Wing', 
@@ -95,7 +115,7 @@ class ProjectFormStrings {
           ]
         },
         
-        // --- Land Specific Details Moved and Expanded ---
+        // --- Land Specific Details ---
         {
           'type': 'row',
           'fields': [
@@ -106,29 +126,21 @@ class ProjectFormStrings {
         {
           'type': 'row',
           'fields': [
-            {'id': 'totalAreaGuntha', 'label': 'Total Area in Guntha', 'type': 'number', 'visibleIf': 'propertyType == Land'},
-            {'id': 'zone', 'label': 'Zone', 'type': 'text', 'visibleIf': 'propertyType == Land'},
+            {'id': 'totalAreaGuntha', 'label': 'Plot Size in Guntha', 'type': 'number', 'visibleIf': 'propertyType == Land'},
           ]
         },
         {
           'type': 'row',
           'fields': [
-            {'id': 'minCostLand', 'label': 'Min Cost', 'type': 'number', 'visibleIf': 'propertyType == Land'},
-            {'id': 'minPercentageLand', 'label': 'Min Percentage', 'type': 'number', 'visibleIf': 'propertyType == Land'},
+            {'id': 'plotCostLand', 'label': 'Plot Cost', 'type': 'number', 'visibleIf': 'propertyType == Land'},
+            {'id': 'sqFtCostLand', 'label': 'Cost per sqft', 'type': 'number', 'visibleIf': 'propertyType == Land'},
           ]
         },
         {
           'type': 'row',
           'fields': [
-            {'id': 'maxCostLand', 'label': 'Max Cost', 'type': 'number', 'visibleIf': 'propertyType == Land'},
-            {'id': 'maxPercentageLand', 'label': 'Max Percentage', 'type': 'number', 'visibleIf': 'propertyType == Land'},
-          ]
-        },
-        {
-          'type': 'row',
-          'fields': [
-            {'id': 'level5Percentage', 'label': 'Level 5 Percentage', 'type': 'number', 'visibleIf': 'propertyType == Land'},
             {'id': 'roadLength', 'label': 'Road Length', 'type': 'text', 'visibleIf': 'propertyType == Land'},
+            {'id': 'zone', 'label': 'Zone', 'type': 'text', 'visibleIf': 'propertyType == Land'},
           ]
         },
         {
@@ -137,30 +149,34 @@ class ProjectFormStrings {
             {
               'id': 'roadDirection', 
               'label': 'Road Direction', 
-              'type': 'chips', 
+              'type': 'dropdown', 
               'options': ['North', 'South', 'East', 'West', 'North-East', 'North-West', 'South-East', 'South-West'],
               'visibleIf': 'propertyType == Land'
             },
-            {'id': 'compoundingDone', 'label': 'Compounding Done', 'type': 'chips', 'options': ['Y', 'N'], 'visibleIf': 'propertyType == Land'},
+            {
+              'id': 'compoundingDone', 
+              'label': 'Compound Done', 
+              'type': 'switch',
+              'visibleIf': 'propertyType == Land'
+            },
           ]
         },
         {
           'type': 'row',
           'fields': [
             {'id': 'fsi', 'label': 'FSI', 'type': 'text', 'visibleIf': 'propertyType == Land'},
-            {'id': 'roadFrontage', 'label': 'Road Frontage', 'type': 'text', 'visibleIf': 'propertyType == Land'},
+            {'id': 'tdr', 'label': 'TDR', 'type': 'text', 'visibleIf': 'propertyType == Land'},
           ]
         },
-        {'id': 'boundaryWall', 'label': 'Boundary Wall', 'type': 'text', 'visibleIf': 'propertyType == Land'},
         {'id': 'roadAccess', 'label': 'Road Access', 'type': 'text', 'visibleIf': 'propertyType == Land'},
         
         // --- Shared Location Fields ---
         {'id': 'flatNo', 'label': 'House/Plot Number (Short)', 'type': 'text'},
         {'id': 'buildingName', 'label': 'Building Name', 'type': 'text', 'visibleIf': 'propertyType != Bungalow && propertyType != Land'},
-        {'id': 'areaName', 'label': 'Area Name', 'type': 'text'},
-        {'id': 'nearby', 'label': 'Nearby', 'type': 'text'},
-        {'id': 'opposite', 'label': 'Opposite', 'type': 'text'},
-        {'id': 'road', 'label': 'Road Name', 'type': 'text'},
+        {'id': 'areaName', 'label': 'Area Name', 'type': 'text', 'visibleIf': 'propertyType != Land'},
+        {'id': 'nearby', 'label': 'Nearby', 'type': 'text', 'visibleIf': 'propertyType != Land'},
+        {'id': 'opposite', 'label': 'Opposite', 'type': 'text', 'visibleIf': 'propertyType != Land'},
+        {'id': 'road', 'label': 'Road Name', 'type': 'text', 'visibleIf': 'propertyType != Land'},
         {
           'type': 'row',
           'fields': [
@@ -171,11 +187,12 @@ class ProjectFormStrings {
         {
           'type': 'row',
           'fields': [
-            {'id': 'village', 'label': 'Village', 'type': 'text'},
+            {'id': 'village', 'label': 'Village', 'type': 'text', 'visibleIf': 'propertyType != Land'},
             {'id': 'pincode', 'label': 'Pincode', 'type': 'number'},
           ]
         },
-        {'id': 'googleLocation', 'label': 'Google Location', 'type': 'text'},
+        {'id': 'location', 'label': 'Location', 'type': 'text', 'visibleIf': 'propertyType != Land'},
+        {'id': 'googleLocationLink', 'label': 'Google Location Link', 'type': 'text'},
         {'id': 'address', 'label': 'Full Address (Auto-generated)', 'type': 'multiline', 'readOnly': true},
         {'id': 'lastUpdatedOn', 'label': 'Last Updated On', 'type': 'text', 'readOnly': true},
       ]
@@ -221,8 +238,8 @@ class ProjectFormStrings {
         {
           'type': 'row',
           'fields': [
-            {'id': 'isReraApproved', 'label': 'Rera Approved?', 'type': 'switch'},
-            {'id': 'reraNumber', 'label': 'Rera Number', 'type': 'text'},
+            {'id': 'isReraApproved', 'label': 'Rera Approved?', 'type': 'switch', 'visibleIf': 'propertyType != Land'},
+            {'id': 'reraNumber', 'label': 'Rera Number', 'type': 'text', 'visibleIf': 'propertyType != Land'},
           ]
         },
         {'id': 'isTitleClear', 'label': 'Title Clear?', 'type': 'switch'},
@@ -238,6 +255,12 @@ class ProjectFormStrings {
         {'id': 'plinthCertificate', 'label': 'Plinth Certificate', 'type': 'file', 'visibleIf': 'propertyType != Land'},
         {'id': 'completionCertificate', 'label': 'Completion Certificate', 'type': 'file', 'visibleIf': 'propertyType != Land'},
         {'id': 'projectReport', 'label': 'Project Report', 'type': 'file'},
+      ]
+    },
+    {
+      'title': sectionOthers,
+      'fields': [
+        {'id': 'otherAttachments', 'label': 'Custom Attachments & Files', 'type': 'custom_attachment_list'},
       ]
     },
     {

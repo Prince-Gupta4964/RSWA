@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import '../../viewmodels/auth_viewmodel.dart';
+import '../../utils/role_permissions.dart';
 import '../../widgets/google_auth_button/google_auth_button.dart';
 
 class LoginView extends StatefulWidget {
@@ -61,6 +62,15 @@ class _LoginViewState extends State<LoginView> {
     super.dispose();
   }
 
+  void _redirectUser(BuildContext context) {
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    if (authVM.appRole == AppRole.viewer) {
+      context.go('/projects');
+    } else {
+      context.go('/dashboard');
+    }
+  }
+
   Future<void> _handleEmailLogin() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
@@ -75,7 +85,7 @@ class _LoginViewState extends State<LoginView> {
     setState(() => _isLoading = false);
 
     if (error == null) {
-      context.go('/dashboard');
+      _redirectUser(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error), backgroundColor: Colors.red),
@@ -91,7 +101,7 @@ class _LoginViewState extends State<LoginView> {
     if (authVM.isAuthenticated) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
-          context.go('/dashboard');
+          _redirectUser(context);
         }
       });
       return Scaffold(
@@ -229,7 +239,9 @@ class _LoginViewState extends State<LoginView> {
                           mode: widget.mode, // 🚀 NAYA
                         );
                         setState(() => _isLoading = false);
-                        if (error != null) {
+                        if (error == null) {
+                          if (mounted) _redirectUser(context);
+                        } else {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(error), backgroundColor: Colors.red),
                           );
