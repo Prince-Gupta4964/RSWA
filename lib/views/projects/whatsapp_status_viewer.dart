@@ -530,6 +530,11 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
                               ],
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
                         ],
                       ),
                     ),
