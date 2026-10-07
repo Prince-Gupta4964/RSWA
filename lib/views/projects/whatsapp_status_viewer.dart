@@ -414,7 +414,7 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
             ),
           ),
 
-          // Instagram Reel Style Right-Side Vertical Action Buttons (Like, Favorite, Share)
+          // Instagram Reel Style Transparent Right-Side Vertical Action Buttons (Like, Favorite, Share)
           Positioned(
             right: 16,
             bottom: 110,
@@ -442,31 +442,24 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
                       },
                       child: Column(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.black45,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white24, width: 1),
-                            ),
-                            child: Icon(
-                              isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                              color: isLiked ? Colors.red : Colors.white,
-                              size: 28,
-                            ),
+                          Icon(
+                            isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                            color: isLiked ? Colors.red : Colors.white,
+                            size: 32,
+                            shadows: const [Shadow(color: Colors.black87, blurRadius: 6)],
                           ),
                           const SizedBox(height: 4),
                           GestureDetector(
                             onTap: () => _showLikedBySheet(context, favs),
                             child: Text(
-                              '${favs.length} Likes',
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 4)]),
+                              '${favs.length}',
+                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 6)]),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
                     // Add to Favorite / Bookmark Button
                     GestureDetector(
@@ -477,42 +470,32 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
                       },
                       child: Column(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.black45,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white24, width: 1),
-                            ),
-                            child: Icon(
-                              isLiked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                              color: isLiked ? const Color(0xFFFF6B22) : Colors.white,
-                              size: 26,
-                            ),
+                          Icon(
+                            isLiked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                            color: isLiked ? const Color(0xFFFF6B22) : Colors.white,
+                            size: 30,
+                            shadows: const [Shadow(color: Colors.black87, blurRadius: 6)],
                           ),
                           const SizedBox(height: 4),
-                          const Text('Save', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 4)])),
+                          const Text('Save', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 6)])),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
                     // Share Button
                     GestureDetector(
                       onTap: _shareProject,
                       child: Column(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.black45,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white24, width: 1),
-                            ),
-                            child: const Icon(Icons.share_rounded, color: Colors.white, size: 26),
+                          const Icon(
+                            Icons.send_rounded,
+                            color: Colors.white,
+                            size: 30,
+                            shadows: [Shadow(color: Colors.black87, blurRadius: 6)],
                           ),
                           const SizedBox(height: 4),
-                          const Text('Share', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 4)])),
+                          const Text('Share', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 6)])),
                         ],
                       ),
                     ),
