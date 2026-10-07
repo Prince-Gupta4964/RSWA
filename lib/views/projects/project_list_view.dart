@@ -900,31 +900,6 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                 tabs: tabs.map((tab) => Tab(text: tab)).toList(),
               ),
             ),
-            const SizedBox(height: 4),
-            _buildCategoryCarousel(),
-            const SizedBox(height: 8),
-            if (activeChips.isNotEmpty)
-              Container(
-                width: double.infinity,
-                color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(children: activeChips),
-                ),
-              ),
-            if (_selectedCity != null || _selectedConditionFilter != null || _selectedTypeFilter != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Text(
-                    _getDynamicListTitle(),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.black87),
-                  ),
-                ),
-              ),
             Expanded(
               child: projectVM.isLoading
                   ? Center(child: CircularProgressIndicator(color: _primaryDark))
@@ -1053,10 +1028,42 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
 
                         return ListView.builder(
                           padding: EdgeInsets.zero,
-                          itemCount: displayProjects.length,
+                          itemCount: displayProjects.length + 1,
                           itemBuilder: (context, index) {
-                            final project = displayProjects[index];
-                            return _buildProjectCard(project, index, displayProjects);
+                            if (index == 0) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 4),
+                                  _buildCategoryCarousel(),
+                                  const SizedBox(height: 8),
+                                  if (activeChips.isNotEmpty)
+                                    Container(
+                                      width: double.infinity,
+                                      color: Colors.white,
+                                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                                      child: SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: Row(children: activeChips),
+                                      ),
+                                    ),
+                                  if (_selectedCity != null || _selectedConditionFilter != null || _selectedTypeFilter != null)
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        child: Text(
+                                          _getDynamicListTitle(),
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.black87),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            }
+                            final project = displayProjects[index - 1];
+                            return _buildProjectCard(project, index - 1, displayProjects);
                           },
                         );
                       }).toList(),
