@@ -147,6 +147,15 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
   @override
   void initState() {
     super.initState();
+    // 🚀 Precache all images immediately for instant lazy loading / zero lag
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (var url in widget.imageUrls) {
+        if (url.isNotEmpty && !url.contains('placeholder')) {
+          precacheImage(NetworkImage(url), context).catchError((_) {});
+        }
+      }
+    });
+
     _animController = AnimationController(vsync: this, duration: _duration);
     _animController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
@@ -300,8 +309,6 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
       return const Center(child: Text('No images available', style: TextStyle(color: Colors.white)));
     }
 
-    final currentUrl = widget.imageUrls[_currentIndex];
-
     return GestureDetector(
       onTapDown: _onTapDown,
       onLongPressStart: _onLongStart,
@@ -309,19 +316,31 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Main Media Image
-          Center(
-            child: Image.network(
-              currentUrl,
-              fit: BoxFit.contain,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return const Center(child: CircularProgressIndicator(color: Colors.white));
-              },
-              errorBuilder: (context, error, stackTrace) => const Center(
-                child: Icon(Icons.broken_image_rounded, color: Colors.white54, size: 64),
-              ),
-            ),
+          // Main Media Image with Offstage preloading for instant zero-lag switching
+          Stack(
+            fit: StackFit.expand,
+            children: [
+              for (int i = 0; i < widget.imageUrls.length; i++)
+                Offstage(
+                  offstage: i != _currentIndex,
+                  child: Center(
+                    child: Image.network(
+                      widget.imageUrls[i],
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        if (i == _currentIndex) {
+                          return const Center(child: CircularProgressIndicator(color: Colors.white));
+                        }
+                        return const SizedBox.shrink();
+                      },
+                      errorBuilder: (context, error, stackTrace) => const Center(
+                        child: Icon(Icons.broken_image_rounded, color: Colors.white54, size: 64),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
 
           // Top Dark Gradient Overlay for Status Bars & Header
