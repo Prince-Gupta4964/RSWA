@@ -1142,7 +1142,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     }
 
     if (allImages.isNotEmpty) {
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => WhatsAppStatusViewer(
             imageUrls: allImages,
