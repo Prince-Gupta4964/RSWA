@@ -1476,6 +1476,12 @@ class _AddProjectViewState extends State<AddProjectView> {
   }
 
   Widget _buildBuilderSelector(String label, String id) {
+    final authVM = Provider.of<AuthViewModel>(context);
+    final bool isAdmin = authVM.appRole == AppRole.admin || authVM.appRole == AppRole.superAdmin;
+    if (!isAdmin) {
+      return const SizedBox.shrink();
+    }
+
     final builderVM = Provider.of<BuilderViewModel>(context);
     final allBuilders = builderVM.builders;
     final optionsNames = allBuilders.map((b) => b.name).toList();
