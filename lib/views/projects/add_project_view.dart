@@ -2841,6 +2841,7 @@ class _AddProjectViewState extends State<AddProjectView> {
       for (var entry in pickedFiles.entries) {
         if (entry.value == null) continue;
         final String fieldId = entry.key;
+        if (fieldId == 'projectVideo') continue; // 🚀 NEVER upload projectVideo to Firebase Storage
         String fileName = (entry.value is XFile) ? (entry.value as XFile).name : (entry.value as PlatformFile).name;
         final String ext = fileName.split('.').last;
         final String path = 'projects/$folderName/${fieldId}_${DateTime.now().millisecondsSinceEpoch}.$ext';
