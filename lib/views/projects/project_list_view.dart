@@ -97,6 +97,27 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     });
   }
 
+  bool get _hasActiveFilters =>
+      _searchCategory != 'All' ||
+      _searchQuery.isNotEmpty ||
+      _selectedCity != null ||
+      _selectedConditionFilter != null ||
+      _selectedTypeFilter != null ||
+      _selectedSubTypeFilter != null ||
+      _selectedConfigurationFilter != null;
+
+  void _clearAllFilters() {
+    setState(() {
+      _searchCategory = 'All';
+      _selectedConditionFilter = null;
+      _selectedTypeFilter = null;
+      _selectedSubTypeFilter = null;
+      _selectedConfigurationFilter = null;
+      _searchQuery = '';
+      _selectedCity = null;
+    });
+  }
+
   void _onTabChanged() {
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     final currentTabs = _getCategoryTabs(authVM);
@@ -105,6 +126,14 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
         setState(() {
           _selectedTab = currentTabs[_tabController.index];
           _selectedProjectIds.clear();
+          // Auto-clear all filters when tab changes
+          _searchCategory = 'All';
+          _selectedConditionFilter = null;
+          _selectedTypeFilter = null;
+          _selectedSubTypeFilter = null;
+          _selectedConfigurationFilter = null;
+          _searchQuery = '';
+          _selectedCity = null;
         });
       }
     }
@@ -810,6 +839,12 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                   onPressed: _showSearchPopup,
                   tooltip: 'Filter',
                 ),
+                if (_hasActiveFilters)
+                  IconButton(
+                    icon: const Icon(Icons.filter_alt_off_rounded, color: Color(0xFFFF6B22)),
+                    onPressed: _clearAllFilters,
+                    tooltip: 'Clear Filters',
+                  ),
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert, color: Colors.black87),
                   onSelected: (value) {
