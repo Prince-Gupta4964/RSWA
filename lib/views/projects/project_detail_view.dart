@@ -1395,18 +1395,14 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
               }
             },
           ),
-          // 4. Videos Tile
+          // 4. Videos Tile (Strictly YouTube only)
           _mediaQuickTile(
             label: 'Videos',
             bgImageUrl: videoThumb,
             centerIcon: Icons.play_circle_fill_rounded,
             onTap: () {
-              if (videoUrl != null && videoUrl.isNotEmpty) {
-                if (videoUrl.contains('youtube.com') || videoUrl.contains('youtu.be')) {
-                  _showYouTubePlayerDialog(context, videoUrl);
-                } else {
-                  _openFile(videoUrl);
-                }
+              if (videoUrl != null && videoUrl.isNotEmpty && (videoUrl.contains('youtube.com') || videoUrl.contains('youtu.be'))) {
+                _showYouTubePlayerDialog(context, videoUrl);
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No project video available.')));
               }

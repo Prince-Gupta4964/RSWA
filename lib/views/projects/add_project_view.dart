@@ -107,6 +107,12 @@ class _AddProjectViewState extends State<AddProjectView> {
       if (widget.project!.propertyDetails.isNotEmpty) {
         _formData.addAll(widget.project!.propertyDetails);
       }
+
+      // 🚀 Discard legacy non-YouTube (Firebase Storage) video URLs
+      final String existingVideo = (_formData['projectVideo'] ?? '').toString().trim();
+      if (existingVideo.isNotEmpty && !existingVideo.contains('youtube.com') && !existingVideo.contains('youtu.be')) {
+        _formData['projectVideo'] = '';
+      }
     }
 
     _formData['isReraApproved'] = _formData['isReraApproved'] ?? 'No';
