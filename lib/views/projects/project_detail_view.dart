@@ -695,6 +695,11 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
         ),
         const SizedBox(height: 12),
       ],
+      if (isAdmin && !widget.isPublicView) ...[
+        const SizedBox(height: 12),
+        _buildEditHistorySection(p),
+        const SizedBox(height: 12),
+      ],
       if (isAdmin && !widget.isPublicView) _buildSection('Admin Controls', Icons.admin_panel_settings_outlined, [
         _detailRow('Approved Status', det['isApproved']),
         _detailRow('Legally Verified', det['isLegallyVerified']),
@@ -2098,6 +2103,60 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
           },
         );
       },
+    );
+  }
+
+  Widget _buildEditHistorySection(ProjectModel project) {
+    final List<dynamic> history = (project.rawData['editHistory'] is Iterable)
+        ? List<dynamic>.from(project.rawData['editHistory'])
+        : [];
+
+    return _buildSection(
+      'Edit History (${history.length})',
+      Icons.history_rounded,
+      history.isEmpty
+          ? [const Text('No edit history recorded yet.', style: TextStyle(color: Colors.grey, fontSize: 13))]
+          : history.map((entry) {
+              final map = entry is Map ? Map<String, dynamic>.from(entry) : <String, dynamic>{};
+              final String editorName = map['editorName'] ?? 'Unknown';
+              final String role = map['role'] ?? 'User';
+              final String action = map['action'] ?? 'Updated';
+              final dynamic ts = map['timestamp'];
+              String timeStr = 'Recently';
+              if (ts != null && ts is Timestamp) {
+                timeStr = DateFormat('dd/MM/yyyy hh:mm a').format(ts.toDate());
+              } else if (ts != null && ts is String) {
+                timeStr = ts;
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 14,
+                      backgroundColor: action == 'Created' ? Colors.green.shade50 : Colors.blue.shade50,
+                      child: Icon(
+                        action == 'Created' ? Icons.add_circle_outline : Icons.edit_outlined,
+                        size: 14,
+                        color: action == 'Created' ? Colors.green : Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('$editorName ($role) - $action', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                          const SizedBox(height: 2),
+                          Text(timeStr, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
     );
   }
 

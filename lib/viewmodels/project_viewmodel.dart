@@ -141,6 +141,14 @@ class ProjectViewModel extends ChangeNotifier {
     final dynamic prio = propertyDetails['isHot'] ?? 'None';
     propertyDetails['isHot'] = prio;
 
+    final Map<String, dynamic> historyEntry = {
+      'editorName': actorName ?? 'Unknown',
+      'editorUid': actorUid ?? '',
+      'role': actorRole ?? '',
+      'timestamp': Timestamp.now(),
+      'action': id != null && id.isNotEmpty ? 'Updated' : 'Created',
+    };
+
     final Map<String, dynamic> data = {
       'projectName': projectName,
       'reraId': reraId,
@@ -159,6 +167,7 @@ class ProjectViewModel extends ChangeNotifier {
         'name': actorName ?? '',
         'role': actorRole ?? '',
       },
+      'editHistory': FieldValue.arrayUnion([historyEntry]),
     };
 
     final String targetDocId = _sanitizeDocId(projectName);
