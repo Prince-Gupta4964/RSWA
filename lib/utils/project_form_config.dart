@@ -269,7 +269,7 @@ class ProjectFormStrings {
       'fields': [
         {'id': 'isApproved', 'label': 'Approve Project', 'type': 'switch', 'roles': ['admin', 'super_admin']},
         {'id': 'isLegallyVerified', 'label': 'Legally Verified', 'type': 'switch', 'roles': ['admin', 'super_admin']},
-        {'id': 'isHot', 'label': 'Priority in Listing', 'type': 'switch'},
+        {'id': 'isHot', 'label': 'Priority in Listing (1 - 30)', 'type': 'dropdown', 'options': ['None', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30'], 'roles': ['admin', 'super_admin']},
         {'id': 'points', 'label': 'Property Points', 'type': 'number'},
         {'id': 'adminRating', 'label': 'Admin Rating', 'type': 'rating'},
         {'id': 'peopleRating', 'label': 'People Rating', 'type': 'rating'},

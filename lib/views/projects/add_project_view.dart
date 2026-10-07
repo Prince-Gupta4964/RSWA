@@ -556,6 +556,28 @@ class _AddProjectViewState extends State<AddProjectView> {
       }
     }
 
+    if (id == 'isHot') {
+      final Set<String> takenPriorities = {};
+      final String currentProjectId = widget.project?.id ?? '';
+
+      for (var p in projectVM.projects) {
+        if (p.id == currentProjectId) continue;
+        final prio = p.priorityNumber;
+        if (prio >= 1 && prio <= 30) {
+          takenPriorities.add(prio.toString());
+        }
+      }
+
+      List<String> available = ['None'];
+      for (int i = 1; i <= 30; i++) {
+        final str = i.toString();
+        if (!takenPriorities.contains(str)) {
+          available.add(str);
+        }
+      }
+      return available;
+    }
+
     return learnedData.toList()..sort();
   }
 

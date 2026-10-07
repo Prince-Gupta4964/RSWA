@@ -33,7 +33,6 @@ class YouTubeUploadService {
       }
     }
 
-    // 2. Try fetching master refresh token from Firestore (settings/youtube), fallback to hardcoded master credentials
     String? refreshToken = defaultRefreshToken;
     String? clientId = defaultClientId;
     String? clientSecret = defaultClientSecret;

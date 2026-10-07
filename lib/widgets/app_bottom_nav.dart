@@ -112,8 +112,11 @@ class _AppBottomNavState extends State<AppBottomNav> {
                     );
                   },
                   onLongPress: () {
+                    debugPrint('NAV LONG PRESS: ${item.keyName}');
                     if (item.keyName == 'dashboard') {
                       configVM.triggerLeadFilter();
+                    } else if (item.keyName == 'projects') {
+                      configVM.triggerProjectFilter();
                     }
                   },
                   child: AnimatedContainer(

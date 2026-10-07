@@ -32,10 +32,13 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   String _selectedTab = 'All Projects';
   String? _selectedConditionFilter;
   String? _selectedTypeFilter;
+  String? _selectedSubTypeFilter;
+  String? _selectedConfigurationFilter;
   String _searchQuery = '';
   String? _selectedCity;
   bool _isSearching = false; // 🚀 NAYA
   int? _lastSearchTriggerCount; // 🚀 NAYA
+  int? _lastProjectFilterTriggerCount; // 🚀 NAYA
   final FocusNode _searchFocusNode = FocusNode(); // 🚀 NAYA
 
   // --- Expanded Search Popup State ---
@@ -274,13 +277,12 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   }
 
   void _showSearchPopup() {
-    String tempQuery = _searchQuery;
     String tempCategory = _searchCategory;
     String? tempType = _selectedTypeFilter;
+    String? tempSubType = _selectedSubTypeFilter;
+    String? tempConfig = _selectedConfigurationFilter;
     String? tempCity = _selectedCity;
     String? tempCondition = _selectedConditionFilter;
-
-    TextEditingController tempSearchCtrl = TextEditingController(text: tempQuery);
 
     showModalBottomSheet(
       context: context,
@@ -289,6 +291,16 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            List<String> subTypes = [];
+            if (tempType == 'Land') {
+              subTypes = ['NA', 'Non - NA'];
+            } else if (tempType != null) {
+              subTypes = ['New', 'UC', 'Resale', 'Rent', 'RTM'];
+            }
+
+            bool showConfig = tempType != null && tempType != 'Land' && tempType != 'Shop';
+            List<String> configs = ['1 BHK', '2 BHK', '3 BHK', '4 BHK', 'Penthouse', 'Studio'];
+
             return Container(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -300,116 +312,228 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
-                  ),
-                  const SizedBox(height: 24),
-
-                  const Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: ['All', 'Residential', 'Commercial', 'Plot'].map((cat) {
-                      bool isSelected = tempCategory == cat;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: _buildPopupChip(cat, isSelected, () => setModalState(() => tempCategory = cat)),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 20),
-
-                  const Text('Property Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 12),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: ['Flat', 'Bungalow', 'Shop', 'Office', 'Plot'].map((type) {
-                        bool isSelected = tempType == type;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: _buildPopupChip(type, isSelected, () => setModalState(() => tempType = isSelected ? null : type)),
-                        );
-                      }).toList(),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
                     ),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
-                  const Text('Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: () async {
-                      final city = await context.push<String>('/city-select');
-                      if (city != null) setModalState(() => tempCity = city);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(12)),
+                    // Property Type
+                    const Text('Property Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 12),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
                       child: Row(
-                        children: [
-                          Icon(Icons.location_on_outlined, color: _primaryDark, size: 20),
-                          const SizedBox(width: 12),
-                          Text(tempCity ?? 'Select City', style: TextStyle(color: tempCity != null ? Colors.black87 : Colors.grey)),
-                          const Spacer(),
-                          if (tempCity != null) IconButton(icon: const Icon(Icons.close, size: 16), onPressed: () => setModalState(() => tempCity = null)),
-                        ],
+                        children: ['Flat', 'Bungalow', 'Shop', 'Land'].map((type) {
+                          bool isSelected = tempType == type;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: _buildPopupChip(type, isSelected, () => setModalState(() {
+                              tempType = isSelected ? null : type;
+                              tempSubType = null;
+                              tempConfig = null;
+                            })),
+                          );
+                        }).toList(),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
 
-                  InkWell(
-                    onTap: _isDetectingLocation ? null : () => _detectCurrentCity(setModalState),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4.0),
-                      child: Row(
-                        children: [
-                          Icon(Icons.my_location, color: Colors.blue.shade600, size: 16),
-                          const SizedBox(width: 8),
-                          Text(_isDetectingLocation ? 'Detecting...' : 'Use current location', style: TextStyle(color: Colors.blue.shade600, fontWeight: FontWeight.w600, fontSize: 13)),
-                        ],
+                    // Property Sub Type (Cascading)
+                    if (subTypes.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      const Text('Property Sub Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const SizedBox(height: 12),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: subTypes.map((sub) {
+                            bool isSelected = tempSubType == sub;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildPopupChip(sub, isSelected, () => setModalState(() => tempSubType = isSelected ? null : sub)),
+                            );
+                          }).toList(),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                    ],
 
-                  const Text('Search', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: tempSearchCtrl,
-                    onChanged: (val) => tempQuery = val,
-                    decoration: InputDecoration(
-                      hintText: 'Project name..',
-                      suffixIcon: Icon(Icons.search, color: _primaryDark),
-                      border: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade300)),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
+                    // Configuration (Cascading)
+                    if (showConfig) ...[
+                      const SizedBox(height: 20),
+                      const Text('Configuration (BHK)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const SizedBox(height: 12),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: configs.map((cfg) {
+                            bool isSelected = tempConfig == cfg;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildPopupChip(cfg, isSelected, () => setModalState(() => tempConfig = isSelected ? null : cfg)),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
 
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _searchQuery = tempQuery;
-                          _searchCategory = tempCategory;
-                          _selectedTypeFilter = tempType;
-                          _selectedCity = tempCity;
-                          _selectedConditionFilter = tempCondition;
-                          _selectedProjectIds.clear();
-                        });
-                        Navigator.pop(context);
+                    const SizedBox(height: 20),
+                    const Text('Location / City', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    Autocomplete<String>(
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+                        final Set<String> allCities = {};
+                        for (var p in projectVM.projects) {
+                          final loc = p.displayLocation;
+                          if (loc != 'Location N/A') {
+                            final city = loc.split(',').last.trim();
+                            if (city.isNotEmpty) allCities.add(city);
+                          }
+                        }
+                        if (textEditingValue.text.isEmpty) {
+                          return allCities.toList();
+                        }
+                        return allCities.where((city) => city.toLowerCase().contains(textEditingValue.text.toLowerCase()));
                       },
-                      style: ElevatedButton.styleFrom(backgroundColor: _primaryDark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                      child: const Text('EXPLORE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      onSelected: (String selection) {
+                        setModalState(() => tempCity = selection);
+                      },
+                      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                        if (tempCity != null && controller.text.isEmpty) {
+                          controller.text = tempCity!;
+                        }
+                        return TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          decoration: InputDecoration(
+                            hintText: 'Search city or location...',
+                            prefixIcon: const Icon(Icons.search, size: 20),
+                            suffixIcon: tempCity != null
+                                ? IconButton(
+                                    icon: const Icon(Icons.close, size: 16),
+                                    onPressed: () {
+                                      controller.clear();
+                                      setModalState(() => tempCity = null);
+                                    },
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          onChanged: (val) {
+                            if (val.trim().isEmpty) {
+                              setModalState(() => tempCity = null);
+                            }
+                          },
+                        );
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
+                    const SizedBox(height: 12),
+                    (() {
+                      final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+                      final Map<String, int> cityCounts = {};
+                      final Map<String, String?> cityImages = {};
+
+                      for (var p in projectVM.projects) {
+                        final loc = p.displayLocation;
+                        if (loc != 'Location N/A') {
+                          final city = loc.split(',').last.trim();
+                          if (city.isNotEmpty) {
+                            cityCounts[city] = (cityCounts[city] ?? 0) + 1;
+                            if (!cityImages.containsKey(city)) {
+                              final details = p.propertyDetails;
+                              final rawImgs = details['images'] is Iterable ? List<String>.from(details['images']) : [];
+                              final cover = p.coverImage ?? details['coverImage']?.toString();
+                              final img = (cover != null && cover.isNotEmpty) ? cover : (rawImgs.isNotEmpty ? rawImgs.first : null);
+                              cityImages[city] = img;
+                            }
+                          }
+                        }
+                      }
+                      final sortedCities = cityCounts.keys.toList()
+                        ..sort((a, b) => cityCounts[b]!.compareTo(cityCounts[a]!));
+
+                      return SizedBox(
+                        height: 84,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(right: 12.0),
+                              child: _buildCityCard(
+                                label: 'All Cities',
+                                image: null,
+                                icon: Icons.grid_view_rounded,
+                                isSelected: tempCity == null,
+                                onTap: () => setModalState(() => tempCity = null),
+                              ),
+                            ),
+                            ...sortedCities.map((city) {
+                              bool isSelected = tempCity == city;
+                              int count = cityCounts[city] ?? 0;
+                              String? img = cityImages[city];
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 12.0),
+                                child: _buildCityCard(
+                                  label: '$city ($count)',
+                                  image: img,
+                                  icon: Icons.location_city_rounded,
+                                  isSelected: isSelected,
+                                  onTap: () => setModalState(() => tempCity = city),
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      );
+                    })(),
+                    const SizedBox(height: 16),
+
+                    InkWell(
+                      onTap: _isDetectingLocation ? null : () => _detectCurrentCity(setModalState),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: Row(
+                          children: [
+                            Icon(Icons.my_location, color: Colors.blue.shade600, size: 16),
+                            const SizedBox(width: 8),
+                            Text(_isDetectingLocation ? 'Detecting...' : 'Use current location', style: TextStyle(color: Colors.blue.shade600, fontWeight: FontWeight.w600, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _searchCategory = tempCategory;
+                            _selectedTypeFilter = tempType;
+                            _selectedSubTypeFilter = tempSubType;
+                            _selectedConfigurationFilter = tempConfig;
+                            _selectedCity = tempCity;
+                            _selectedConditionFilter = tempCondition;
+                            _selectedProjectIds.clear();
+                          });
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: _primaryDark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                        child: const Text('EXPLORE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             );
           },
@@ -429,6 +553,55 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
           border: Border.all(color: isSelected ? _primaryDark : Colors.grey.shade300),
         ),
         child: Text(label, style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500, color: isSelected ? _primaryDark : Colors.black87)),
+      ),
+    );
+  }
+
+  Widget _buildCityCard({
+    required String label,
+    String? image,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected ? _primaryDark : Colors.grey.shade300,
+                width: isSelected ? 2.5 : 1.5,
+              ),
+              image: image != null && image.isNotEmpty && image.startsWith('http')
+                  ? DecorationImage(image: NetworkImage(image), fit: BoxFit.cover)
+                  : null,
+              color: Colors.grey.shade100,
+            ),
+            child: image == null || !image.startsWith('http')
+                ? Icon(icon, color: isSelected ? _primaryDark : Colors.grey.shade600, size: 22)
+                : null,
+          ),
+          const SizedBox(height: 5),
+          SizedBox(
+            width: 70,
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? _primaryDark : Colors.black87,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -464,6 +637,17 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
           Future.delayed(const Duration(milliseconds: 100), () {
             if (mounted) _searchFocusNode.requestFocus();
           });
+        }
+      });
+    }
+
+    if (_lastProjectFilterTriggerCount == null) {
+      _lastProjectFilterTriggerCount = configVM.projectFilterTriggerCount;
+    } else if (configVM.projectFilterTriggerCount > _lastProjectFilterTriggerCount!) {
+      _lastProjectFilterTriggerCount = configVM.projectFilterTriggerCount;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showSearchPopup();
         }
       });
     }
@@ -631,6 +815,11 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                           _selectedProjectIds.add(projectVM.projects.firstWhere((p) => !p.isDeleted).id);
                         }
                       });
+                    } else if (value == 'refresh') {
+                      projectVM.fetchProjects();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Projects refreshed!'), backgroundColor: Colors.green, duration: Duration(seconds: 1)),
+                      );
                     }
                   },
                   itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -651,6 +840,16 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                           Icon(Icons.tune_rounded, color: Colors.black54),
                           SizedBox(width: 12),
                           Text('Filter Projects'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'refresh',
+                      child: Row(
+                        children: [
+                          Icon(Icons.refresh_rounded, color: Colors.black54),
+                          SizedBox(width: 12),
+                          Text('Refresh'),
                         ],
                       ),
                     ),
@@ -766,7 +965,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                             if (!isMine) return false;
                           } else if (currentTabName == 'Hot Projects') {
                             int rating = _projectRatings[project.id] ?? 0;
-                            if (!project.isHot && rating < 4 && !isLiked) return false;
+                            if (project.priorityNumber == 999 && rating < 4 && !isLiked) return false;
                             if (!isApprovedBool) return false;
                           } else if (currentTabName == 'Fav Projects') {
                             if (!isLiked) return false;
@@ -783,12 +982,28 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                           if (!isBypassTab) {
                             if (!_matchesSearchCategory(project.propertyType)) return false;
                             if (_selectedTypeFilter != null && project.propertyType != _selectedTypeFilter) return false;
+                            if (_selectedSubTypeFilter != null) {
+                              final sub = (project.propertyDetails['subType'] ?? project.propertyDetails['condition'] ?? project.rawData['subType'] ?? '').toString().toLowerCase();
+                              if (sub != _selectedSubTypeFilter!.toLowerCase()) return false;
+                            }
+                            if (_selectedConfigurationFilter != null) {
+                              final config = (project.propertyDetails['configuration'] ?? project.rawData['configuration'] ?? '').toString().toLowerCase();
+                              if (!config.contains(_selectedConfigurationFilter!.toLowerCase())) return false;
+                            }
                             if (!_matchesSelectedCondition(project)) return false;
 
                             if (_selectedCity != null) {
-                              String rawLoc = project.propertyDetails['location']?.toString() ?? '';
-                              String city = rawLoc.split(',').last.trim();
-                              if (city.toLowerCase() != _selectedCity!.toLowerCase()) return false;
+                              final projLoc = project.displayLocation.toLowerCase();
+                              final targetCity = _selectedCity!.toLowerCase();
+                              bool matches = projLoc.contains(targetCity);
+                              final parts = targetCity.split(RegExp(r'[\s\-]'));
+                              for (var part in parts) {
+                                if (part.trim().length > 2 && projLoc.contains(part.trim())) {
+                                  matches = true;
+                                  break;
+                                }
+                              }
+                              if (!matches) return false;
                             }
                           }
 
@@ -796,9 +1011,10 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                         }).toList();
 
                         displayProjects.sort((a, b) {
-                          // 1. Hot projects always at the top
-                          if (a.isHot && !b.isHot) return -1;
-                          if (!a.isHot && b.isHot) return 1;
+                          // 1. Prioritized / Hot projects at the top (1, 2, 3... 30)
+                          final pA = a.priorityNumber;
+                          final pB = b.priorityNumber;
+                          if (pA != pB) return pA.compareTo(pB);
 
                           // 2. Newest projects first (recently added)
                           final t1 = a.rawData['timestamp'];
@@ -807,17 +1023,6 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                             int timeCompare = t2.compareTo(t1); // Descending (newest first)
                             if (timeCompare != 0) return timeCompare;
                           }
-
-                          // 3. Fallback: Rating
-                          int aRating = _projectRatings[a.id] ?? 0;
-                          int bRating = _projectRatings[b.id] ?? 0;
-                          if (aRating != bRating) return bRating.compareTo(aRating);
-
-                          // 4. Fallback: Liked status
-                          bool aLiked = _likedProjects[a.id] ?? false;
-                          bool bLiked = _likedProjects[b.id] ?? false;
-                          if (aLiked && !bLiked) return -1;
-                          if (!aLiked && bLiked) return 1;
 
                           return 0;
                         });
@@ -840,7 +1045,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                           itemCount: displayProjects.length,
                           itemBuilder: (context, index) {
                             final project = displayProjects[index];
-                            return _buildProjectCard(project);
+                            return _buildProjectCard(project, index, displayProjects);
                           },
                         );
                       }).toList(),
@@ -910,7 +1115,52 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     }
   }
 
-  Widget _buildProjectCard(ProjectModel project) {
+  void _openStatusViewer(List<ProjectModel> displayProjects, int initialIndex) {
+    if (initialIndex < 0 || initialIndex >= displayProjects.length) return;
+    final project = displayProjects[initialIndex];
+    final details = project.propertyDetails;
+    final displayImage = (project.coverImage ?? details['coverImage'])?.toString().trim();
+    final imageUrls = details['imageUrls'] is Iterable ? List<String>.from(details['imageUrls']) : [];
+    final location = project.displayLocation;
+
+    final List<String> allImages = [];
+    if (displayImage != null) allImages.add(displayImage);
+    for (var img in imageUrls) {
+      if (img.isNotEmpty && !allImages.contains(img)) allImages.add(img);
+    }
+    final rawImgs = details['images'] is Iterable ? List<String>.from(details['images']) : [];
+    for (var img in rawImgs) {
+      if (img.isNotEmpty && !allImages.contains(img)) allImages.add(img);
+    }
+    final highImgs = details['highlightsImages'] is Iterable ? List<String>.from(details['highlightsImages']) : [];
+    for (var img in highImgs) {
+      if (img.isNotEmpty && !allImages.contains(img)) allImages.add(img);
+    }
+    final outImgs = details['outdoorsImages'] is Iterable ? List<String>.from(details['outdoorsImages']) : [];
+    for (var img in outImgs) {
+      if (img.isNotEmpty && !allImages.contains(img)) allImages.add(img);
+    }
+
+    if (allImages.isNotEmpty) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => WhatsAppStatusViewer(
+            imageUrls: allImages,
+            projectName: project.projectName,
+            location: location,
+            projectId: project.id,
+            onNextProject: initialIndex < displayProjects.length - 1
+                ? () => _openStatusViewer(displayProjects, initialIndex + 1)
+                : null,
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No images available for status view.')));
+    }
+  }
+
+  Widget _buildProjectCard(ProjectModel project, int index, List<ProjectModel> displayProjects) {
     final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     final bool isAdmin = authVM.appRole == AppRole.admin || authVM.appRole == AppRole.superAdmin;
@@ -995,38 +1245,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                         _toggleProjectSelection(project.id);
                         return;
                       }
-                      final List<String> allImages = [];
-                      if (displayImage != null) allImages.add(displayImage);
-                      for (var img in imageUrls) {
-                        if (img.isNotEmpty && !allImages.contains(img)) allImages.add(img);
-                      }
-                      final rawImgs = details['images'] is Iterable ? List<String>.from(details['images']) : [];
-                      for (var img in rawImgs) {
-                        if (img.isNotEmpty && !allImages.contains(img)) allImages.add(img);
-                      }
-                      final highImgs = details['highlightsImages'] is Iterable ? List<String>.from(details['highlightsImages']) : [];
-                      for (var img in highImgs) {
-                        if (img.isNotEmpty && !allImages.contains(img)) allImages.add(img);
-                      }
-                      final outImgs = details['outdoorsImages'] is Iterable ? List<String>.from(details['outdoorsImages']) : [];
-                      for (var img in outImgs) {
-                        if (img.isNotEmpty && !allImages.contains(img)) allImages.add(img);
-                      }
-
-                      if (allImages.isNotEmpty) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => WhatsAppStatusViewer(
-                              imageUrls: allImages,
-                              projectName: project.projectName,
-                              location: location,
-                              projectId: project.id,
-                            ),
-                          ),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No images available for status view.')));
-                      }
+                      _openStatusViewer(displayProjects, index);
                     },
                     child: Stack(
                       fit: StackFit.expand,

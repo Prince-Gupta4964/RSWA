@@ -71,6 +71,10 @@ class ProjectViewModel extends ChangeNotifier {
                 .toList();
 
             _projects.sort((a, b) {
+              final pA = a.priorityNumber;
+              final pB = b.priorityNumber;
+              if (pA != pB) return pA.compareTo(pB);
+
               final tsA = a.rawData['timestamp'] is Timestamp ? (a.rawData['timestamp'] as Timestamp).millisecondsSinceEpoch : 0;
               final tsB = b.rawData['timestamp'] is Timestamp ? (b.rawData['timestamp'] as Timestamp).millisecondsSinceEpoch : 0;
               if (tsA != tsB) return tsB.compareTo(tsA);
@@ -86,6 +90,34 @@ class ProjectViewModel extends ChangeNotifier {
             notifyListeners();
           },
         );
+  }
+
+  Future<void> enforceUniquePriority(String currentProjectId, dynamic priorityValue) async {
+    if (priorityValue == null || priorityValue.toString() == 'None' || priorityValue.toString() == 'false' || priorityValue.toString() == '0' || priorityValue.toString() == '') {
+      return;
+    }
+    final String targetPriority = priorityValue.toString();
+
+    try {
+      final snapshot = await _db.collection('projects').get();
+      for (var doc in snapshot.docs) {
+        if (doc.id == currentProjectId) continue;
+        final data = doc.data();
+        final currentPrio = (data['isHot'] ?? data['propertyDetails']?['isHot'])?.toString();
+        if (currentPrio == targetPriority) {
+          Map<String, dynamic> pd = data['propertyDetails'] is Map ? Map<String, dynamic>.from(data['propertyDetails']) : {};
+          pd['isHot'] = 'None';
+          await _db.collection('projects').doc(doc.id).update({
+            'isHot': 'None',
+            'propertyDetails': pd,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+          debugPrint('Priority uniqueness: Cleared priority $targetPriority from project ${doc.id}');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error enforcing unique priority: $e');
+    }
   }
 
   Future<void> addOrUpdateProject({
@@ -106,6 +138,9 @@ class ProjectViewModel extends ChangeNotifier {
     final String isApproved = propertyDetails['isApproved']?.toString() ?? 'No';
     propertyDetails['isApproved'] = isApproved;
 
+    final dynamic prio = propertyDetails['isHot'] ?? 'None';
+    propertyDetails['isHot'] = prio;
+
     final Map<String, dynamic> data = {
       'projectName': projectName,
       'reraId': reraId,
@@ -115,6 +150,7 @@ class ProjectViewModel extends ChangeNotifier {
       'contactNumber': contactNumber,
       'propertyDetails': propertyDetails,
       'isApproved': isApproved,
+      'isHot': prio,
       'builderIds': builderIds ?? [],
       'updatedAt': FieldValue.serverTimestamp(),
       'updatedBy': {
@@ -126,6 +162,7 @@ class ProjectViewModel extends ChangeNotifier {
     };
 
     final String targetDocId = _sanitizeDocId(projectName);
+    await enforceUniquePriority(targetDocId, prio);
 
     if (id != null && id.isNotEmpty) {
       // 🚀 EDIT MODE: Do NOT overwrite createdByUid or createdBy!

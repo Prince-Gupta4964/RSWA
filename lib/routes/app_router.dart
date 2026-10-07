@@ -43,7 +43,6 @@ import '../widgets/app_drawer.dart';
 import '../features/map_screen/screens/map_screen.dart';
 import '../features/map_screen/screens/task_detail_page.dart';
 import '../features/map_screen/screens/assignee_tasks_view.dart';
-import '../views/shared_widgets/widget_showcase_screen.dart';
 import '../features/map_screen/models/task.dart';
 
 class AppRouter {
@@ -355,11 +354,6 @@ class AppRouter {
         parentNavigatorKey: _rootNavigatorKey,
         path: '/profile',
         builder: (context, state) => const AuthGuard(child: MyProfileView()),
-      ),
-      GoRoute(
-        parentNavigatorKey: _rootNavigatorKey,
-        path: '/widget-showcase',
-        builder: (context, state) => const AuthGuard(child: WidgetShowcaseScreen()),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

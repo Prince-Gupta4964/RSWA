@@ -1732,6 +1732,37 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
                         ),
                       ),
                     ),
+
+                    // Hot Icon Button (Admin & Super Admin only)
+                    if (authVM.appRole == AppRole.admin || authVM.appRole == AppRole.superAdmin) ...[
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () {
+                          final bool currentHot = p.isHot == true || p.isHot.toString().toLowerCase() == 'true';
+                          projectVM.toggleHotStatus(p.id, !currentHot);
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: (p.isHot == true || p.isHot.toString().toLowerCase() == 'true') ? Colors.orange.shade50 : const Color(0xFFF8FAFC),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: (p.isHot == true || p.isHot.toString().toLowerCase() == 'true') ? Colors.orange.shade200 : const Color(0xFFE2E8F0),
+                              width: 1,
+                            ),
+                          ),
+                          child: Center(
+                            child: Icon(
+                              Icons.local_fire_department_rounded,
+                              color: (p.isHot == true || p.isHot.toString().toLowerCase() == 'true') ? Colors.orange : const Color(0xFF64748B),
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
 

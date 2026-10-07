@@ -8,7 +8,7 @@ class ProjectModel {
   final String contactNumber;
   final Map<String, dynamic> propertyDetails;
   final List<String> builderIds;
-  final bool isHot;
+  final Object? isHot;
   final bool isApproved;
   final bool isDeleted; // 🚀 NAYA
   final String? createdByUid;
@@ -26,6 +26,17 @@ class ProjectModel {
     return loc.isNotEmpty && loc != 'null' ? loc : 'Location N/A';
   }
 
+  int get priorityNumber {
+    final val = isHot;
+    if (val is int) return val;
+    if (val is String) {
+      final p = int.tryParse(val);
+      if (p != null) return p;
+    }
+    if (val == true) return 1;
+    return 999;
+  }
+
   ProjectModel({
     required this.id,
     required this.projectName,
@@ -36,7 +47,7 @@ class ProjectModel {
     required this.contactNumber,
     required this.propertyDetails,
     this.builderIds = const [],
-    this.isHot = false,
+    this.isHot = 'None',
     this.isApproved = false,
     this.isDeleted = false, // 🚀 NAYA
     this.createdByUid,
@@ -79,7 +90,7 @@ class ProjectModel {
       contactNumber: data['contactNumber'] ?? '',
       propertyDetails: pd,
       builderIds: (data['builderIds'] is Iterable) ? List<String>.from(data['builderIds']) : [],
-      isHot: data['isHot'] == true,
+      isHot: data['isHot'] ?? pd['isHot'] ?? 'None',
       isApproved: isApprovedFinal,
       isDeleted: data['isDeleted'] == true,
       createdByUid: data['createdByUid']?.toString() ?? cbUid,

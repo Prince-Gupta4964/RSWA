@@ -31,6 +31,14 @@ class AppConfigurationViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  int _projectFilterTriggerCount = 0;
+  int get projectFilterTriggerCount => _projectFilterTriggerCount;
+
+  void triggerProjectFilter() {
+    _projectFilterTriggerCount++;
+    notifyListeners();
+  }
+
   // Manual timer to ensure NO DELAY on single tap
   DateTime? _lastTapTime;
   String? _lastTappedTab;
