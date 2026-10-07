@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:ui_web' as ui_web;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:web/web.dart' as web;
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../models/project_model.dart';
 
@@ -156,9 +159,46 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
   bool get _hasVideo => widget.videoUrl != null && widget.videoUrl!.isNotEmpty && (widget.videoUrl!.contains('youtube.com') || widget.videoUrl!.contains('youtu.be'));
   int get _totalItems => (_hasVideo ? 1 : 0) + widget.imageUrls.length;
 
+  String? get _videoId {
+    if (widget.videoUrl == null) return null;
+    try {
+      final uri = Uri.parse(widget.videoUrl!);
+      if (uri.host.contains('youtube.com')) {
+        String? v = uri.queryParameters['v'];
+        if (v == null && uri.pathSegments.isNotEmpty) {
+          v = uri.pathSegments.last;
+        }
+        return v;
+      } else if (uri.host.contains('youtu.be')) {
+        return uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
+    // 🚀 Register YouTube view factory for Web
+    if (kIsWeb && _videoId != null) {
+      try {
+        final origin = Uri.base.origin;
+        // ignore: undefined_prefixed_name
+        ui_web.platformViewRegistry.registerViewFactory(
+          'youtube-iframe-status-$_videoId',
+          (int viewId) {
+            final web.HTMLIFrameElement iframe = web.document.createElement('iframe') as web.HTMLIFrameElement;
+            iframe.src = 'https://www.youtube.com/embed/$_videoId?autoplay=1&origin=$origin';
+            iframe.style.border = 'none';
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+            return iframe;
+          },
+        );
+      } catch (_) {}
+    }
+
     // 🚀 Precache all images immediately for instant lazy loading / zero lag
     WidgetsBinding.instance.addPostFrameCallback((_) {
       for (var url in widget.imageUrls) {
@@ -191,7 +231,11 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
 
   void _startStory() {
     if (_totalItems == 0) return;
-    _animController.forward(from: 0.0);
+    if (_currentIndex == 0 && _hasVideo) {
+      _animController.stop();
+    } else {
+      _animController.forward(from: 0.0);
+    }
   }
 
   void _nextImage() {
@@ -199,7 +243,11 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
       setState(() {
         _currentIndex++;
       });
-      _animController.forward(from: 0.0);
+      if (_currentIndex == 0 && _hasVideo) {
+        _animController.stop();
+      } else {
+        _animController.forward(from: 0.0);
+      }
     } else {
       widget.onPageComplete();
     }
@@ -210,9 +258,17 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
       setState(() {
         _currentIndex--;
       });
-      _animController.forward(from: 0.0);
+      if (_currentIndex == 0 && _hasVideo) {
+        _animController.stop();
+      } else {
+        _animController.forward(from: 0.0);
+      }
     } else {
-      _animController.forward(from: 0.0);
+      if (_currentIndex == 0 && _hasVideo) {
+        _animController.stop();
+      } else {
+        _animController.forward(from: 0.0);
+      }
     }
   }
 
@@ -234,7 +290,9 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
 
   void _onLongEnd(LongPressEndDetails details) {
     setState(() => _isPaused = false);
-    _animController.forward();
+    if (!(_currentIndex == 0 && _hasVideo)) {
+      _animController.forward();
+    }
   }
 
   void _showLikedBySheet(BuildContext context, List<dynamic> uids) {
@@ -295,7 +353,9 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
     ).whenComplete(() {
       if (mounted) {
         setState(() => _isPaused = false);
-        _animController.forward();
+        if (!(_currentIndex == 0 && _hasVideo)) {
+          _animController.forward();
+        }
       }
     });
   }
@@ -327,51 +387,39 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. Main Media Item: Video card if index 0 and has video, otherwise image stack
+          // 1. Main Media Item: Direct inline YouTube player if index 0 and has video, otherwise image stack
           _currentIndex == 0 && _hasVideo
-              ? Center(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 24),
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade900,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFFF6B22), width: 2),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.play_circle_fill_rounded, size: 72, color: Color(0xFFFF6B22)),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Project Video Available',
-                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          widget.projectName,
-                          style: const TextStyle(color: Colors.white70, fontSize: 14),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            final Uri uri = Uri.parse(widget.videoUrl!);
-                            canLaunchUrl(uri).then((canLaunch) {
-                              if (canLaunch) launchUrl(uri, mode: LaunchMode.externalApplication);
-                            });
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF6B22),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          icon: const Icon(Icons.play_arrow_rounded),
-                          label: const Text('Play YouTube Video', style: TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ],
+              ? Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  color: Colors.black,
+                  child: Center(
+                    child: Container(
+                      width: MediaQuery.of(context).size.width * 0.95,
+                      height: MediaQuery.of(context).size.height * 0.55,
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFFF6B22), width: 2),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: kIsWeb && _videoId != null
+                            ? HtmlElementView(viewType: 'youtube-iframe-status-$_videoId')
+                            : Center(
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    final Uri uri = Uri.parse(widget.videoUrl!);
+                                    canLaunchUrl(uri).then((canLaunch) {
+                                      if (canLaunch) launchUrl(uri, mode: LaunchMode.externalApplication);
+                                    });
+                                  },
+                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B22)),
+                                  icon: const Icon(Icons.play_arrow),
+                                  label: const Text('Play YouTube Video'),
+                                ),
+                              ),
+                      ),
                     ),
                   ),
                 )
