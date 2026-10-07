@@ -181,13 +181,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
           ],
         ),
         bottomNavigationBar: widget.isPublicView ? _publicBottomActions(details) : _bottomActions(details),
-        floatingActionButton: (!widget.isPublicView &&
-                authVM.appRole != AppRole.viewer &&
-                (authVM.appRole == AppRole.admin ||
-                 authVM.appRole == AppRole.superAdmin ||
-                 authVM.appRole == AppRole.officeStaff ||
-                 project.rawData['createdBy']?.toString() == authVM.userName ||
-                 project.rawData['addedBy']?.toString() == authVM.userName))
+        floatingActionButton: (!widget.isPublicView && _canEditProject(authVM, project))
             ? FloatingActionButton(
                 backgroundColor: const Color(0xFFFF6B22),
                 onPressed: () => context.push('/add-project', extra: project),
@@ -196,6 +190,29 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
             : null,
       ),
     );
+  }
+
+  bool _canEditProject(AuthViewModel authVM, ProjectModel project) {
+    if (authVM.appRole == AppRole.viewer) return false;
+    if (authVM.appRole == AppRole.admin || authVM.appRole == AppRole.superAdmin || authVM.appRole == AppRole.officeStaff) {
+      return true;
+    }
+    final String myUid = authVM.userUid.trim();
+    final String myName = authVM.userName.trim().toLowerCase();
+    final String myContact = (authVM.userData?['contactNo'] ?? '').toString().trim();
+
+    final String cUid = (project.createdByUid ?? '').trim();
+    final cb = project.rawData['createdBy'];
+    final String cbUid = (cb is Map ? cb['uid'] ?? '' : '').toString().trim();
+    final String cbName = (cb is Map ? cb['name'] ?? '' : '').toString().trim().toLowerCase();
+    final String addedBy = (project.rawData['addedBy'] ?? '').toString().trim().toLowerCase();
+    final String projContact = (project.rawData['contactNo'] ?? project.propertyDetails['contactNo'] ?? '').toString().trim();
+
+    bool isMine = (myUid.isNotEmpty && (cUid == myUid || cbUid == myUid)) ||
+        (myName.isNotEmpty && (cbName == myName || addedBy == myName || (project.rawData['createdBy']?.toString().toLowerCase() == myName))) ||
+        (myContact.isNotEmpty && projContact.isNotEmpty && projContact == myContact);
+
+    return isMine;
   }
 
   Widget _buildPublicBrandingBanner() {

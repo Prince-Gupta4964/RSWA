@@ -73,6 +73,36 @@ class _AddProjectViewState extends State<AddProjectView> {
     }
 
     if (widget.project != null) {
+      if (authVM.appRole == AppRole.cp) {
+        final project = widget.project!;
+        final String myUid = authVM.userUid.trim();
+        final String myName = authVM.userName.trim().toLowerCase();
+        final String myContact = (authVM.userData?['contactNo'] ?? '').toString().trim();
+
+        final String cUid = (project.createdByUid ?? '').trim();
+        final cb = project.rawData['createdBy'];
+        final String cbUid = (cb is Map ? cb['uid'] ?? '' : '').toString().trim();
+        final String cbName = (cb is Map ? cb['name'] ?? '' : '').toString().trim().toLowerCase();
+        final String addedBy = (project.rawData['addedBy'] ?? '').toString().trim().toLowerCase();
+        final String projContact = (project.rawData['contactNo'] ?? project.propertyDetails['contactNo'] ?? '').toString().trim();
+
+        bool isMine = (myUid.isNotEmpty && (cUid == myUid || cbUid == myUid)) ||
+            (myName.isNotEmpty && (cbName == myName || addedBy == myName || (project.rawData['createdBy']?.toString().toLowerCase() == myName))) ||
+            (myContact.isNotEmpty && projContact.isNotEmpty && projContact == myContact);
+
+        if (!isMine) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('You can only edit projects added by yourself.'), backgroundColor: Colors.red),
+              );
+              context.pop();
+            }
+          });
+          return;
+        }
+      }
+
       _formData.addAll(widget.project!.rawData);
       if (widget.project!.propertyDetails.isNotEmpty) {
         _formData.addAll(widget.project!.propertyDetails);
