@@ -43,6 +43,13 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
 
   // --- Expanded Search Popup State ---
   String _searchCategory = 'All';
+  final List<Map<String, dynamic>> _categories = [
+    {'label': 'All', 'icon': Icons.grid_view_rounded, 'value': 'All'},
+    {'label': 'Flats', 'icon': Icons.apartment_rounded, 'value': 'Apartment'},
+    {'label': 'Shops', 'icon': Icons.storefront_outlined, 'value': 'Shop'},
+    {'label': 'Bungalow', 'icon': Icons.gite_outlined, 'value': 'Bungalow'},
+    {'label': 'Land', 'icon': Icons.landscape_outlined, 'value': 'Land'},
+  ];
   bool _isDetectingLocation = false;
 
   final Map<String, List<String>> _activeFilters = {};
@@ -891,6 +898,8 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                 tabs: tabs.map((tab) => Tab(text: tab)).toList(),
               ),
             ),
+            const SizedBox(height: 4),
+            _buildCategoryCarousel(),
             const SizedBox(height: 8),
             if (activeChips.isNotEmpty)
               Container(
@@ -1113,6 +1122,63 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
       if (res.endsWith('.0')) res = res.substring(0, res.length - 2);
       return res;
     }
+  }
+
+  Widget _buildCategoryCarousel() {
+    return Container(
+      height: 88,
+      color: Colors.white,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        itemCount: _categories.length,
+        itemBuilder: (context, index) {
+          final cat = _categories[index];
+          final isSelected = _searchCategory == cat['value'] || (_searchCategory == 'All' && cat['value'] == 'All');
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _searchCategory = cat['value'];
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    height: 44,
+                    width: 44,
+                    decoration: BoxDecoration(
+                      color: isSelected ? _primaryDark : Colors.grey.shade100,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected ? _primaryDark : Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Icon(
+                      cat['icon'],
+                      color: isSelected ? Colors.white : Colors.black87,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    cat['label'],
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      color: isSelected ? _primaryDark : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _openStatusViewer(List<ProjectModel> displayProjects, int initialIndex) {
