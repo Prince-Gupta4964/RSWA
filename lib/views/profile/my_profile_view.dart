@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../viewmodels/auth_viewmodel.dart';
+import '../../viewmodels/project_viewmodel.dart';
 import '../../utils/role_permissions.dart';
 
 class MyProfileView extends StatelessWidget {
@@ -61,7 +62,7 @@ class MyProfileView extends StatelessWidget {
           const SizedBox(height: 32),
 
           // Levels and Points
-          _buildMetricsRow(),
+          _buildMetricsRow(context),
           const SizedBox(height: 24),
 
           // Information Cards
@@ -239,12 +240,49 @@ class MyProfileView extends StatelessWidget {
     );
   }
 
-  Widget _buildMetricsRow() {
+  int _calculateUserPoints(BuildContext context) {
+    final projectVM = Provider.of<ProjectViewModel>(context);
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    
+    int totalFilledFields = 0;
+    final String myUid = authVM.userUid.trim();
+    final String myName = authVM.userName.trim().toLowerCase();
+
+    for (var project in projectVM.projects) {
+      final String cUid = (project.createdByUid ?? '').trim();
+      final cb = project.rawData['createdBy'];
+      final String cbUid = (cb is Map ? cb['uid'] ?? '' : '').toString().trim();
+      final String cbName = (cb is Map ? cb['name'] ?? '' : '').toString().trim().toLowerCase();
+      final String addedBy = (project.rawData['addedBy'] ?? '').toString().trim().toLowerCase();
+
+      bool isMine = (myUid.isNotEmpty && (cUid == myUid || cbUid == myUid)) ||
+          (myName.isNotEmpty && (cbName == myName || addedBy == myName || (project.rawData['createdBy']?.toString().toLowerCase() == myName)));
+
+      if (isMine) {
+        final Map<String, dynamic> combined = {...project.rawData, ...project.propertyDetails};
+        for (var entry in combined.entries) {
+          if (entry.value != null) {
+            final valStr = entry.value.toString().trim();
+            if (valStr.isNotEmpty && valStr != 'null' && valStr != 'No' && valStr != '[]' && valStr != '{}') {
+              totalFilledFields++;
+            }
+          }
+        }
+      }
+    }
+
+    return totalFilledFields * 5;
+  }
+
+  Widget _buildMetricsRow(BuildContext context) {
+    final int points = _calculateUserPoints(context);
+    final String level = points > 1000 ? 'Expert' : (points > 500 ? 'Achiever' : 'Scout');
+
     return Row(
       children: [
-        _buildMetricItem('Level', 'Scout', Icons.military_tech_outlined, Colors.amber.shade700),
+        _buildMetricItem('Level', level, Icons.military_tech_outlined, Colors.amber.shade700),
         const SizedBox(width: 12),
-        _buildMetricItem('Points', '1500', Icons.stars_rounded, const Color(0xFFFF6B22)),
+        _buildMetricItem('Points', points.toString(), Icons.stars_rounded, const Color(0xFFFF6B22)),
       ],
     );
   }
