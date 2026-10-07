@@ -1149,9 +1149,8 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
             projectName: project.projectName,
             location: location,
             projectId: project.id,
-            onNextProject: initialIndex < displayProjects.length - 1
-                ? () => _openStatusViewer(displayProjects, initialIndex + 1)
-                : null,
+            projects: displayProjects,
+            initialIndex: initialIndex,
           ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             const begin = Offset(0.0, 1.0);
