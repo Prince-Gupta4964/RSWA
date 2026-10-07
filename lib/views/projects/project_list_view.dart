@@ -1143,8 +1143,8 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
 
     if (allImages.isNotEmpty) {
       Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => WhatsAppStatusViewer(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => WhatsAppStatusViewer(
             imageUrls: allImages,
             projectName: project.projectName,
             location: location,
@@ -1153,6 +1153,15 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                 ? () => _openStatusViewer(displayProjects, initialIndex + 1)
                 : null,
           ),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            const begin = Offset(0.0, 1.0);
+            const end = Offset.zero;
+            const curve = Curves.easeInOut;
+            var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+            var offsetAnimation = animation.drive(tween);
+            return SlideTransition(position: offsetAnimation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 350),
         ),
       );
     } else {
