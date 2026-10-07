@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../viewmodels/auth_viewmodel.dart';
-import '../../viewmodels/project_viewmodel.dart';
 import '../../models/project_model.dart';
 
 class WhatsAppStatusViewer extends StatefulWidget {
+  final String? videoUrl;
   final List<String> imageUrls;
   final String projectName;
   final String location;
@@ -17,6 +18,7 @@ class WhatsAppStatusViewer extends StatefulWidget {
 
   const WhatsAppStatusViewer({
     super.key,
+    this.videoUrl,
     required this.imageUrls,
     required this.projectName,
     required this.location,
@@ -60,6 +62,9 @@ class _WhatsAppStatusViewerState extends State<WhatsAppStatusViewer> {
             final imageUrls = details['imageUrls'] is Iterable ? List<String>.from(details['imageUrls']) : [];
             final location = proj.displayLocation;
 
+            final String? rawVideo = (details['projectVideo'] ?? proj.rawData['projectVideo'])?.toString().trim();
+            final String? projectVideo = (rawVideo != null && (rawVideo.contains('youtube.com') || rawVideo.contains('youtu.be'))) ? rawVideo : null;
+
             final List<String> allImages = [];
             if (displayImage != null) allImages.add(displayImage);
             for (var img in imageUrls) {
@@ -79,6 +84,7 @@ class _WhatsAppStatusViewerState extends State<WhatsAppStatusViewer> {
             }
 
             return _SingleStatusPage(
+              videoUrl: projectVideo,
               imageUrls: allImages.isNotEmpty ? allImages : ['https://via.placeholder.com/600'],
               projectName: proj.projectName,
               location: location,
@@ -104,6 +110,7 @@ class _WhatsAppStatusViewerState extends State<WhatsAppStatusViewer> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: _SingleStatusPage(
+        videoUrl: widget.videoUrl,
         imageUrls: widget.imageUrls,
         projectName: widget.projectName,
         location: widget.location,
@@ -116,6 +123,7 @@ class _WhatsAppStatusViewerState extends State<WhatsAppStatusViewer> {
 }
 
 class _SingleStatusPage extends StatefulWidget {
+  final String? videoUrl;
   final List<String> imageUrls;
   final String projectName;
   final String location;
@@ -124,6 +132,7 @@ class _SingleStatusPage extends StatefulWidget {
   final VoidCallback onPageComplete;
 
   const _SingleStatusPage({
+    this.videoUrl,
     required this.imageUrls,
     required this.projectName,
     required this.location,
@@ -143,6 +152,9 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
   bool _isPaused = false;
   bool _showHint = true;
   final Duration _duration = const Duration(seconds: 4);
+
+  bool get _hasVideo => widget.videoUrl != null && widget.videoUrl!.isNotEmpty && (widget.videoUrl!.contains('youtube.com') || widget.videoUrl!.contains('youtu.be'));
+  int get _totalItems => (_hasVideo ? 1 : 0) + widget.imageUrls.length;
 
   @override
   void initState() {
@@ -178,12 +190,12 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
   }
 
   void _startStory() {
-    if (widget.imageUrls.isEmpty) return;
+    if (_totalItems == 0) return;
     _animController.forward(from: 0.0);
   }
 
   void _nextImage() {
-    if (_currentIndex < widget.imageUrls.length - 1) {
+    if (_currentIndex < _totalItems - 1) {
       setState(() {
         _currentIndex++;
       });
@@ -303,10 +315,9 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
   @override
   Widget build(BuildContext context) {
     final authVM = Provider.of<AuthViewModel>(context);
-    final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
 
-    if (widget.imageUrls.isEmpty) {
-      return const Center(child: Text('No images available', style: TextStyle(color: Colors.white)));
+    if (_totalItems == 0) {
+      return const Center(child: Text('No media available', style: TextStyle(color: Colors.white)));
     }
 
     return GestureDetector(
@@ -316,36 +327,85 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Main Media Image with Offstage preloading for instant zero-lag switching
-          Stack(
-            fit: StackFit.expand,
-            children: [
-              for (int i = 0; i < widget.imageUrls.length; i++)
-                Offstage(
-                  offstage: i != _currentIndex,
-                  child: Center(
-                    child: Image.network(
-                      widget.imageUrls[i],
-                      fit: BoxFit.contain,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        if (i == _currentIndex) {
-                          return const Center(child: CircularProgressIndicator(color: Colors.white));
-                        }
-                        return const SizedBox.shrink();
-                      },
-                      errorBuilder: (context, error, stackTrace) => const Center(
-                        child: Icon(Icons.broken_image_rounded, color: Colors.white54, size: 64),
-                      ),
+          // 1. Main Media Item: Video card if index 0 and has video, otherwise image stack
+          _currentIndex == 0 && _hasVideo
+              ? Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade900,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFFF6B22), width: 2),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.play_circle_fill_rounded, size: 72, color: Color(0xFFFF6B22)),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Project Video Available',
+                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.projectName,
+                          style: const TextStyle(color: Colors.white70, fontSize: 14),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            final Uri uri = Uri.parse(widget.videoUrl!);
+                            canLaunchUrl(uri).then((canLaunch) {
+                              if (canLaunch) launchUrl(uri, mode: LaunchMode.externalApplication);
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFF6B22),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.play_arrow_rounded),
+                          label: const Text('Play YouTube Video', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
                     ),
                   ),
+                )
+              : Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    for (int i = 0; i < widget.imageUrls.length; i++)
+                      Offstage(
+                        offstage: i != (_currentIndex - (_hasVideo ? 1 : 0)),
+                        child: Center(
+                          child: Image.network(
+                            widget.imageUrls[i],
+                            fit: BoxFit.contain,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              if (i == (_currentIndex - (_hasVideo ? 1 : 0))) {
+                                return const Center(child: CircularProgressIndicator(color: Colors.white));
+                              }
+                              return const SizedBox.shrink();
+                            },
+                            errorBuilder: (context, error, stackTrace) => const Center(
+                              child: Icon(Icons.broken_image_rounded, color: Colors.white54, size: 64),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-            ],
-          ),
 
-          // Top Dark Gradient Overlay for Status Bars & Header
+          // 2. Top Dark Gradient Overlay for Status Bars & Header
           Positioned(
-            top: 0, left: 0, right: 0,
+            top: 0,
+            left: 0,
+            right: 0,
             child: Container(
               padding: const EdgeInsets.only(top: 10, bottom: 20),
               decoration: const BoxDecoration(
@@ -363,33 +423,27 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: Row(
-                        children: widget.imageUrls.asMap().entries.map((entry) {
-                          int index = entry.key;
+                        children: List.generate(_totalItems, (index) {
                           return Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                              padding: const EdgeInsets.symmetric(horizontal: 2),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(2),
                                 child: LinearProgressIndicator(
-                                  value: index < _currentIndex
-                                      ? 1.0
-                                      : index == _currentIndex
-                                          ? _animController.value
-                                          : 0.0,
-                                  backgroundColor: Colors.white.withValues(alpha: 0.3),
-                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                  value: index < _currentIndex ? 1.0 : (index == _currentIndex ? _animController.value : 0.0),
+                                  backgroundColor: Colors.white24,
+                                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF6B22)),
                                   minHeight: 2.5,
                                 ),
                               ),
                             ),
                           );
-                        }).toList(),
+                        }),
                       ),
                     ),
-
-                    // Header Profile & Close Button
+                    // Header Details
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: Row(
                         children: [
                           CircleAvatar(
@@ -407,22 +461,26 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
                               children: [
                                 Text(
                                   widget.projectName,
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
                                 ),
-                                Text(
-                                  widget.location,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.location_on, color: Color(0xFFFF6B22), size: 12),
+                                    const SizedBox(width: 3),
+                                    Expanded(
+                                      child: Text(
+                                        widget.location,
+                                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
-                            onPressed: () => Navigator.of(context).pop(),
                           ),
                         ],
                       ),
@@ -433,102 +491,13 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
             ),
           ),
 
-          // Instagram Reel Style Transparent Right-Side Vertical Action Buttons (Like, Favorite, Share)
+          // 3. Bottom Action Bar & Hint
           Positioned(
-            right: 16,
-            bottom: 110,
-            child: StreamBuilder<DocumentSnapshot>(
-              stream: authVM.userUid.isNotEmpty 
-                  ? FirebaseFirestore.instance.collection('projects').doc(widget.projectId).snapshots()
-                  : const Stream.empty(),
-              builder: (context, snapshot) {
-                List<dynamic> favs = [];
-                if (snapshot.hasData && snapshot.data!.exists) {
-                  final data = snapshot.data!.data() as Map<String, dynamic>?;
-                  favs = data?['favUids'] ?? (data?['propertyDetails']?['favUids'] ?? []);
-                }
-                final bool isLiked = authVM.userUid.isNotEmpty && favs.contains(authVM.userUid);
-
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Like / Heart Button & Count
-                    GestureDetector(
-                      onTap: () {
-                        if (authVM.userUid.isNotEmpty) {
-                          projectVM.toggleProjectFavorite(widget.projectId, authVM.userUid, List<String>.from(favs));
-                        }
-                      },
-                      child: Column(
-                        children: [
-                          Icon(
-                            isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                            color: isLiked ? Colors.red : Colors.white,
-                            size: 32,
-                            shadows: const [Shadow(color: Colors.black87, blurRadius: 6)],
-                          ),
-                          const SizedBox(height: 4),
-                          GestureDetector(
-                            onTap: () => _showLikedBySheet(context, favs),
-                            child: Text(
-                              '${favs.length}',
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 6)]),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Add to Favorite / Bookmark Button
-                    GestureDetector(
-                      onTap: () {
-                        if (authVM.userUid.isNotEmpty) {
-                          projectVM.toggleProjectFavorite(widget.projectId, authVM.userUid, List<String>.from(favs));
-                        }
-                      },
-                      child: Column(
-                        children: [
-                          Icon(
-                            isLiked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                            color: isLiked ? const Color(0xFFFF6B22) : Colors.white,
-                            size: 30,
-                            shadows: const [Shadow(color: Colors.black87, blurRadius: 6)],
-                          ),
-                          const SizedBox(height: 4),
-                          const Text('Save', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 6)])),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Share Button
-                    GestureDetector(
-                      onTap: _shareProject,
-                      child: Column(
-                        children: [
-                          const Icon(
-                            Icons.send_rounded,
-                            color: Colors.white,
-                            size: 30,
-                            shadows: [Shadow(color: Colors.black87, blurRadius: 6)],
-                          ),
-                          const SizedBox(height: 4),
-                          const Text('Share', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 6)])),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-
-          // Bottom Gradient Overlay for Details
-          Positioned(
-            bottom: 0, left: 0, right: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
             child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 30, 80, 24),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Colors.transparent, Colors.black87],
@@ -536,64 +505,146 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
                   end: Alignment.bottomCenter,
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.projectName,
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 4)]),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined, color: Colors.white70, size: 14),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          widget.location,
-                          style: const TextStyle(color: Colors.white70, fontSize: 13, shadows: [Shadow(color: Colors.black, blurRadius: 4)]),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Swipe Up Gesture Hint Animation Overlay (Only on first page)
-          if (widget.isFirstPage && _showHint)
-            Positioned(
-              bottom: 30,
-              left: 0,
-              right: 0,
-              child: AnimatedBuilder(
-                animation: _hintAnimController,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(0, -8 * _hintAnimController.value),
-                    child: Opacity(
-                      opacity: 1.0 - (_hintAnimController.value * 0.3),
-                      child: Center(
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_showHint && widget.isFirstPage)
+                      FadeTransition(
+                        opacity: _hintAnimController,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                          decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white, size: 18),
-                              SizedBox(width: 4),
-                              Text('Swipe up for next property', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                            ],
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            '💡 Tap left/right to navigate • Hold to pause • Swipe up/down for next property',
+                            style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+                            textAlign: TextAlign.center,
                           ),
                         ),
                       ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // Like Button
+                        StreamBuilder<DocumentSnapshot>(
+                          stream: FirebaseFirestore.instance.collection('projects').doc(widget.projectId).snapshots(),
+                          builder: (context, snapshot) {
+                            List<String> favUids = [];
+                            if (snapshot.hasData && snapshot.data!.exists) {
+                              final d = snapshot.data!.data() as Map<String, dynamic>?;
+                              final rawFavs = d?['favUids'] ?? d?['propertyDetails']?['favUids'];
+                              if (rawFavs is Iterable) {
+                                favUids = List<String>.from(rawFavs);
+                              }
+                            }
+                            final bool isLiked = authVM.userUid.isNotEmpty && favUids.contains(authVM.userUid);
+
+                            return InkWell(
+                              onTap: () async {
+                                if (authVM.userUid.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to like properties.')));
+                                  return;
+                                }
+                                final docRef = FirebaseFirestore.instance.collection('projects').doc(widget.projectId);
+                                if (isLiked) {
+                                  await docRef.update({
+                                    'favUids': FieldValue.arrayRemove([authVM.userUid]),
+                                    'propertyDetails.favUids': FieldValue.arrayRemove([authVM.userUid]),
+                                  });
+                                } else {
+                                  await docRef.update({
+                                    'favUids': FieldValue.arrayUnion([authVM.userUid]),
+                                    'propertyDetails.favUids': FieldValue.arrayUnion([authVM.userUid]),
+                                  });
+                                }
+                              },
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 24,
+                                    backgroundColor: Colors.white24,
+                                    child: Icon(
+                                      isLiked ? Icons.favorite : Icons.favorite_border,
+                                      color: isLiked ? Colors.red : Colors.white,
+                                      size: 26,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${favUids.length}',
+                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+
+                        // Liked By Users List
+                        StreamBuilder<DocumentSnapshot>(
+                          stream: FirebaseFirestore.instance.collection('projects').doc(widget.projectId).snapshots(),
+                          builder: (context, snapshot) {
+                            List<dynamic> favUids = [];
+                            if (snapshot.hasData && snapshot.data!.exists) {
+                              final d = snapshot.data!.data() as Map<String, dynamic>?;
+                              final rawFavs = d?['favUids'] ?? d?['propertyDetails']?['favUids'];
+                              if (rawFavs is Iterable) {
+                                favUids = List<dynamic>.from(rawFavs);
+                              }
+                            }
+                            return InkWell(
+                              onTap: () => _showLikedBySheet(context, favUids),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const CircleAvatar(
+                                    radius: 24,
+                                    backgroundColor: Colors.white24,
+                                    child: Icon(Icons.people_outline_rounded, color: Colors.white, size: 26),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Liked By',
+                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+
+                        // Share Button
+                        InkWell(
+                          onTap: _shareProject,
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Colors.white24,
+                                child: Icon(Icons.share_rounded, color: Colors.white, size: 26),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Share',
+                                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
             ),
+          ),
         ],
       ),
     );
