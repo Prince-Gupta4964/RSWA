@@ -616,15 +616,18 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   bool _matchesSearchCategory(String type) {
     if (_searchCategory == 'All' || _searchCategory.isEmpty) return true;
     final t = type.toLowerCase();
+    final cat = _searchCategory.toLowerCase();
     if (t == 'project') return true;
-    if (_searchCategory == 'Residential') {
-      return t == 'flat' || t == 'bungalow' || t == 'residential';
-    } else if (_searchCategory == 'Commercial') {
-      return t == 'shop' || t == 'office' || t == 'showroom' || t == 'commercial';
-    } else if (_searchCategory == 'Plot') {
-      return t == 'plot' || t == 'land';
+    if (cat == 'apartment' || cat == 'flat') {
+      return t == 'flat' || t == 'apartment' || t == 'residential' || t == 'flats';
+    } else if (cat == 'shop') {
+      return t == 'shop' || t == 'commercial' || t == 'office' || t == 'showroom' || t == 'shops';
+    } else if (cat == 'bungalow') {
+      return t == 'bungalow' || t == 'villa';
+    } else if (cat == 'land' || cat == 'plot') {
+      return t == 'land' || t == 'plot';
     }
-    return true;
+    return t.contains(cat);
   }
 
   @override
@@ -699,14 +702,14 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
       );
     }
 
-    if (_searchQuery.isNotEmpty || _searchCategory != 'All') {
+    if (_searchQuery.isNotEmpty) {
       activeChips.insert(
         0,
         Padding(
           padding: const EdgeInsets.only(right: 8.0),
           child: Chip(
             label: Text(
-              'Search: $_searchCategory${_searchQuery.isNotEmpty ? ' - $_searchQuery' : ''}',
+              'Search: $_searchQuery',
               style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue.shade800),
             ),
             backgroundColor: Colors.blue.shade50,
@@ -714,7 +717,6 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
             deleteIconColor: Colors.blue.shade800,
             onDeleted: () => setState(() {
               _searchQuery = '';
-              _searchCategory = 'All';
             }),
           ),
         ),
@@ -1126,57 +1128,61 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
 
   Widget _buildCategoryCarousel() {
     return Container(
-      height: 88,
+      width: double.infinity,
       color: Colors.white,
-      child: ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        itemCount: _categories.length,
-        itemBuilder: (context, index) {
-          final cat = _categories[index];
-          final isSelected = _searchCategory == cat['value'] || (_searchCategory == 'All' && cat['value'] == 'All');
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _searchCategory = cat['value'];
-              });
-            },
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 6),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    height: 44,
-                    width: 44,
-                    decoration: BoxDecoration(
-                      color: isSelected ? _primaryDark : Colors.grey.shade100,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isSelected ? _primaryDark : Colors.grey.shade300,
-                        width: 1.5,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: _categories.map((cat) {
+            final isSelected = _searchCategory == cat['value'] || (_searchCategory == 'All' && cat['value'] == 'All');
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _searchCategory = cat['value'];
+                });
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      height: 52,
+                      width: 52,
+                      decoration: BoxDecoration(
+                        color: isSelected ? _primaryDark : Colors.grey.shade100,
+                        shape: BoxShape.circle,
+                        boxShadow: isSelected
+                            ? [BoxShadow(color: _primaryDark.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))]
+                            : null,
+                        border: Border.all(
+                          color: isSelected ? _primaryDark : Colors.grey.shade300,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Icon(
+                        cat['icon'],
+                        color: isSelected ? Colors.white : Colors.black87,
+                        size: 22,
                       ),
                     ),
-                    child: Icon(
-                      cat['icon'],
-                      color: isSelected ? Colors.white : Colors.black87,
-                      size: 20,
+                    const SizedBox(height: 6),
+                    Text(
+                      cat['label'],
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        color: isSelected ? _primaryDark : Colors.black87,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    cat['label'],
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                      color: isSelected ? _primaryDark : Colors.black87,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          }).toList(),
+        ),
       ),
     );
   }
