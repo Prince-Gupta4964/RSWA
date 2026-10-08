@@ -45,6 +45,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   String _searchCategory = 'All';
   final List<Map<String, dynamic>> _categories = [
     {'label': 'All', 'icon': Icons.grid_view_rounded, 'value': 'All'},
+    {'label': 'Projects', 'icon': Icons.location_city_rounded, 'value': 'Project'},
     {'label': 'Flats', 'icon': Icons.apartment_rounded, 'value': 'Apartment'},
     {'label': 'Shops', 'icon': Icons.storefront_outlined, 'value': 'Shop'},
     {'label': 'Bungalow', 'icon': Icons.gite_outlined, 'value': 'Bungalow'},
@@ -646,8 +647,9 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     if (_searchCategory == 'All' || _searchCategory.isEmpty) return true;
     final t = type.toLowerCase();
     final cat = _searchCategory.toLowerCase();
-    if (t == 'project') return true;
-    if (cat == 'apartment' || cat == 'flat') {
+    if (cat == 'project') {
+      return t == 'project' || t == 'residential';
+    } else if (cat == 'apartment' || cat == 'flat') {
       return t == 'flat' || t == 'apartment' || t == 'residential' || t == 'flats';
     } else if (cat == 'shop') {
       return t == 'shop' || t == 'commercial' || t == 'office' || t == 'showroom' || t == 'shops';
@@ -1172,7 +1174,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     return Container(
       width: double.infinity,
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -1186,35 +1188,35 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                 });
               },
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 10),
+                margin: const EdgeInsets.symmetric(horizontal: 6),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      height: 52,
-                      width: 52,
+                      height: 34,
+                      width: 34,
                       decoration: BoxDecoration(
                         color: isSelected ? _primaryDark : Colors.grey.shade100,
                         shape: BoxShape.circle,
                         boxShadow: isSelected
-                            ? [BoxShadow(color: _primaryDark.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))]
+                            ? [BoxShadow(color: _primaryDark.withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))]
                             : null,
                         border: Border.all(
                           color: isSelected ? _primaryDark : Colors.grey.shade300,
-                          width: 1.5,
+                          width: 1.2,
                         ),
                       ),
                       child: Icon(
                         cat['icon'],
                         color: isSelected ? Colors.white : Colors.black87,
-                        size: 22,
+                        size: 16,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       cat['label'],
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                         color: isSelected ? _primaryDark : Colors.black87,
                       ),
