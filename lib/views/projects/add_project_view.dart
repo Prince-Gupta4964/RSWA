@@ -118,6 +118,10 @@ class _AddProjectViewState extends State<AddProjectView> {
     _formData['isReraApproved'] = _formData['isReraApproved'] ?? 'No';
     _formData['isTitleClear'] = _formData['isTitleClear'] ?? 'No';
     _formData['isLegallyVerified'] = _formData['isLegallyVerified'] ?? 'No';
+    _formData['isHold'] = _formData['isHold'] ?? 'No';
+    _formData['isBlock'] = _formData['isBlock'] ?? 'No';
+    _formData['isJunk'] = _formData['isJunk'] ?? 'No';
+    _formData['isOthers'] = _formData['isOthers'] ?? 'No';
     
     if (widget.project == null) {
       _formData['isApproved'] = 'No';
