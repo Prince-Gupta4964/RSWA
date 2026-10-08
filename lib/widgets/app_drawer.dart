@@ -208,6 +208,14 @@ class AppDrawer extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
                   ),
+                  if (authVM.userEmail.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      authVM.userEmail,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  ],
                   const SizedBox(height: 2),
                   Row(
                     children: [
