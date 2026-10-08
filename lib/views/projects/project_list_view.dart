@@ -1171,61 +1171,74 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   }
 
   Widget _buildCategoryCarousel() {
-    return Container(
-      width: double.infinity,
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: _categories.map((cat) {
-            final isSelected = _searchCategory == cat['value'] || (_searchCategory == 'All' && cat['value'] == 'All');
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _searchCategory = cat['value'];
-                });
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      height: 28,
-                      width: 28,
-                      decoration: BoxDecoration(
-                        color: isSelected ? _primaryDark : Colors.grey.shade100,
-                        shape: BoxShape.circle,
-                        boxShadow: isSelected
-                            ? [BoxShadow(color: _primaryDark.withValues(alpha: 0.4), blurRadius: 4, offset: const Offset(0, 1))]
-                            : null,
-                        border: Border.all(
-                          color: isSelected ? _primaryDark : Colors.grey.shade300,
-                          width: 1.0,
+    return Center(
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: _categories.map((cat) {
+              final isSelected = _searchCategory == cat['value'] || (_searchCategory == 'All' && cat['value'] == 'All');
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _searchCategory = cat['value'];
+                  });
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        height: 36,
+                        width: 36,
+                        decoration: BoxDecoration(
+                          color: isSelected ? _primaryDark : Colors.grey.shade100,
+                          shape: BoxShape.circle,
+                          boxShadow: isSelected
+                              ? [BoxShadow(color: _primaryDark.withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))]
+                              : null,
+                          border: Border.all(
+                            color: isSelected ? _primaryDark : Colors.grey.shade300,
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Icon(
+                          cat['icon'],
+                          color: isSelected ? Colors.white : Colors.black87,
+                          size: 18,
                         ),
                       ),
-                      child: Icon(
-                        cat['icon'],
-                        color: isSelected ? Colors.white : Colors.black87,
-                        size: 14,
+                      const SizedBox(height: 3),
+                      Text(
+                        cat['label'],
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          color: isSelected ? _primaryDark : Colors.black87,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      cat['label'],
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                        color: isSelected ? _primaryDark : Colors.black87,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          }).toList(),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
