@@ -1174,7 +1174,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     return Container(
       width: double.infinity,
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -1188,35 +1188,35 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                 });
               },
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 6),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      height: 34,
-                      width: 34,
+                      height: 28,
+                      width: 28,
                       decoration: BoxDecoration(
                         color: isSelected ? _primaryDark : Colors.grey.shade100,
                         shape: BoxShape.circle,
                         boxShadow: isSelected
-                            ? [BoxShadow(color: _primaryDark.withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))]
+                            ? [BoxShadow(color: _primaryDark.withValues(alpha: 0.4), blurRadius: 4, offset: const Offset(0, 1))]
                             : null,
                         border: Border.all(
                           color: isSelected ? _primaryDark : Colors.grey.shade300,
-                          width: 1.2,
+                          width: 1.0,
                         ),
                       ),
                       child: Icon(
                         cat['icon'],
                         color: isSelected ? Colors.white : Colors.black87,
-                        size: 16,
+                        size: 14,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       cat['label'],
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                         color: isSelected ? _primaryDark : Colors.black87,
                       ),
