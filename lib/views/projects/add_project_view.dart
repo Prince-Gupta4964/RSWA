@@ -118,10 +118,22 @@ class _AddProjectViewState extends State<AddProjectView> {
     _formData['isReraApproved'] = _formData['isReraApproved'] ?? 'No';
     _formData['isTitleClear'] = _formData['isTitleClear'] ?? 'No';
     _formData['isLegallyVerified'] = _formData['isLegallyVerified'] ?? 'No';
-    _formData['isHold'] = _formData['isHold'] ?? 'No';
-    _formData['isBlock'] = _formData['isBlock'] ?? 'No';
-    _formData['isJunk'] = _formData['isJunk'] ?? 'No';
-    _formData['isOthers'] = _formData['isOthers'] ?? 'No';
+    
+    if (_formData['projectStatus'] == null) {
+      if (_formData['isHold'] == 'Yes' || _formData['isHold'] == true) {
+        _formData['projectStatus'] = 'Hold';
+      } else if (_formData['isBlock'] == 'Yes' || _formData['isBlock'] == true) {
+        _formData['projectStatus'] = 'Block';
+      } else if (_formData['alreadyExists'] == 'Yes' || _formData['alreadyExists'] == true) {
+        _formData['projectStatus'] = 'Already Exists';
+      } else if (_formData['isJunk'] == 'Yes' || _formData['isJunk'] == true) {
+        _formData['projectStatus'] = 'Junk';
+      } else if (_formData['isOthers'] == 'Yes' || _formData['isOthers'] == true) {
+        _formData['projectStatus'] = 'Others';
+      } else {
+        _formData['projectStatus'] = 'Stack';
+      }
+    }
     
     if (widget.project == null) {
       _formData['isApproved'] = 'No';
@@ -874,6 +886,7 @@ class _AddProjectViewState extends State<AddProjectView> {
     switch (type) {
       case 'custom_attachment_list': return _buildCustomAttachmentList(label, id);
       case 'media_list': return _buildMediaList(label, id);
+      case 'project_status_selector': return _buildProjectStatusSelector(label, id);
       case 'chips': return _buildChoiceChips(label, id, configVM.getOptionsForField('Project Form', id, List<String>.from(field['options'] ?? [])));
       case 'addable_chips': return _buildAddableChips(label, id, configVM.getOptionsForField('Project Form', id, List<String>.from(field['options'] ?? [])));
       case 'dropdown': 
@@ -2476,6 +2489,56 @@ class _AddProjectViewState extends State<AddProjectView> {
         ElevatedButton(onPressed: () { if (ctrl.text.isNotEmpty) onAdd(ctrl.text.trim()); Navigator.pop(ctx); }, style: ElevatedButton.styleFrom(backgroundColor: secondaryColor), child: const Text('Add', style: TextStyle(color: Colors.white))),
       ],
     ));
+  }
+
+  Widget _buildProjectStatusSelector(String label, String id) {
+    final List<String> statuses = ['Stack', 'Hold', 'Block', 'Already Exists', 'Junk', 'Others'];
+    final currentStatus = _formData[id]?.toString() ?? 'Stack';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFCCCCCC)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: statuses.map((status) {
+              final isSelected = currentStatus == status;
+              return ChoiceChip(
+                label: Text(status),
+                selected: isSelected,
+                selectedColor: secondaryColor,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : Colors.black87,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  fontSize: 12,
+                ),
+                backgroundColor: Colors.grey.shade100,
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _formData[id] = status;
+                    });
+                  }
+                },
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSwitchField(String label, String id) {

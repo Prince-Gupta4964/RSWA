@@ -703,11 +703,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
       if (isAdmin && !widget.isPublicView) _buildSection('Admin Controls', Icons.admin_panel_settings_outlined, [
         _detailRow('Approved Status', det['isApproved']),
         _detailRow('Legally Verified', det['isLegallyVerified']),
-        _detailRow('Hold', det['isHold']),
-        _detailRow('Block', det['isBlock']),
-        _detailRow('Already Exists', det['alreadyExists']),
-        _detailRow('Junk', det['isJunk']),
-        _detailRow('Others', det['isOthers']),
+        _detailRow('Status', det['projectStatus'] ?? 'Stack'),
         _detailRow('Priority Listing', det['isHot']),
         _detailRow('Property Points', det['points']),
       ]),
