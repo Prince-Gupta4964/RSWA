@@ -122,8 +122,32 @@ class _CampaignDashboardScreenState extends State<CampaignDashboardScreen> {
                                           ),
                                           const SizedBox(width: 8),
                                           InkWell(
-                                            onTap: () => vm.deleteCampaign(c.id),
-                                            child: const Icon(Icons.delete, color: Colors.white70, size: 18),
+                                            onTap: () async {
+                                              final confirm = await showDialog<bool>(
+                                                context: context,
+                                                builder: (ctx) => AlertDialog(
+                                                  title: const Text('Delete Campaign'),
+                                                  content: Text('Are you sure you want to delete "${c.name}"?'),
+                                                  actions: [
+                                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                                    TextButton(
+                                                      onPressed: () => Navigator.pop(ctx, true),
+                                                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              if (confirm == true && context.mounted) {
+                                                await vm.deleteCampaign(c.id);
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(content: Text('Campaign deleted successfully')),
+                                                );
+                                              }
+                                            },
+                                            child: const Padding(
+                                              padding: EdgeInsets.all(4.0),
+                                              child: Icon(Icons.delete, color: Colors.white70, size: 18),
+                                            ),
                                           )
                                         ],
                                       ),
