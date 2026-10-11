@@ -58,7 +58,9 @@ class CPViewModel extends ChangeNotifier {
       }).toList();
       updateCombined();
     }, onError: (error) {
-      debugPrint("Firebase CP Fetch Error: $error");
+      debugPrint("⚠️ FIREBASE CP FETCH ERROR: $error. Please check your Firestore Security Rules in Firebase Console.");
+      _isLoading = false;
+      notifyListeners();
     });
 
     _db.collection('customers').snapshots().listen((snapshot) {

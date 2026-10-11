@@ -92,7 +92,7 @@ class ProjectViewModel extends ChangeNotifier {
             notifyListeners();
           },
           onError: (error) {
-            debugPrint("Firebase Fetch Error: $error");
+            debugPrint("⚠️ FIREBASE FETCH ERROR (PROJECTS): $error. Please check your Firestore Security Rules in Firebase Console.");
             _isLoading = false;
             notifyListeners();
           },

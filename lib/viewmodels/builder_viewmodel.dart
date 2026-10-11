@@ -30,7 +30,7 @@ class BuilderViewModel extends ChangeNotifier {
       _standardBuilders = snapshot.docs.map((doc) => BuilderModel.fromMap(doc.data(), doc.id, collection: 'builders')).toList();
       _combineBuilders();
     }, onError: (error) {
-      debugPrint("Firebase Builder Fetch Error: $error");
+      debugPrint("⚠️ FIREBASE BUILDER FETCH ERROR: $error. Please check your Firestore Security Rules in Firebase Console.");
       _isLoading = false;
       notifyListeners();
     });

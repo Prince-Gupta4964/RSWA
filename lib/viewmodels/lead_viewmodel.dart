@@ -39,11 +39,7 @@ class LeadViewModel extends ChangeNotifier {
   }
 
   LeadViewModel() {
-    try {
-      _loadAllTabSettings();
-    } catch (e) {
-      debugPrint('Error loading tab settings: $e');
-    }
+    _loadAllTabSettings();
     fetchLeads();
   }
 
@@ -208,7 +204,7 @@ class LeadViewModel extends ChangeNotifier {
             notifyListeners();
           },
           onError: (error) {
-            print("Firebase Fetch Error: $error");
+            print("⚠️ FIREBASE FETCH ERROR (LEADS): $error. Please check your Firestore Security Rules in Firebase Console.");
             _isLoading = false;
             notifyListeners();
           },
