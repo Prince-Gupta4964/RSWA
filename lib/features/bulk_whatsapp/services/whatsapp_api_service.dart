@@ -41,11 +41,18 @@ class WhatsAppApiService {
         final uri = Uri.parse(_baseUrl);
 
         final formattedButtons = buttons.map((b) {
-          final Map<String, dynamic> newB = Map.from(b);
-          final urlVal = newB['url'] ?? newB['link'] ?? '';
-          if (urlVal.toString().isNotEmpty) {
-            newB['url'] = urlVal;
-            newB['link'] = urlVal;
+          final Map<String, dynamic> newB = {};
+          final text = b['text']?.toString() ?? '';
+          final url = b['url']?.toString() ?? b['link']?.toString() ?? '';
+          final phone = b['phone']?.toString() ?? '';
+
+          newB['text'] = text;
+          if (url.isNotEmpty) {
+            newB['url'] = url;
+            newB['link'] = url;
+          }
+          if (phone.isNotEmpty) {
+            newB['phone'] = phone;
           }
           return newB;
         }).toList();
@@ -63,22 +70,16 @@ class WhatsAppApiService {
           body["variables"]["footer"] = footerText;
         }
 
-        // Include media if present in button templates (with both snake_case and camelCase for Deropo API compatibility)
+        // Include media if present in button templates
         if (imageUrl != null && imageUrl.isNotEmpty) {
           if (imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.contains('document')) {
             body["document_url"] = imageUrl;
-            body["variables"]["document_url"] = imageUrl;
-            body["variables"]["documentUrl"] = imageUrl;
             body["file_name"] = fileName ?? 'Document.pdf';
           } else {
             body["image_url"] = imageUrl;
-            body["variables"]["image_url"] = imageUrl;
-            body["variables"]["imageUrl"] = imageUrl;
           }
         } else if (documentUrl != null && documentUrl.isNotEmpty) {
           body["document_url"] = documentUrl;
-          body["variables"]["document_url"] = documentUrl;
-          body["variables"]["documentUrl"] = documentUrl;
           if (fileName != null) body["file_name"] = fileName;
         }
 
@@ -96,12 +97,10 @@ class WhatsAppApiService {
         params['message'] = message;
       }
 
-      if (type == 'image' && imageUrl != null && imageUrl.isNotEmpty) {
+      if (type == 'image' && imageUrl != null) {
         params['image_url'] = imageUrl;
-        params['imageUrl'] = imageUrl;
-      } else if (type == 'document' && documentUrl != null && documentUrl.isNotEmpty) {
+      } else if (type == 'document' && documentUrl != null) {
         params['document_url'] = documentUrl;
-        params['documentUrl'] = documentUrl;
         if (fileName != null) params['file_name'] = fileName;
       } else if (type == 'template' && templateId != null) {
         params['template_id'] = templateId;
