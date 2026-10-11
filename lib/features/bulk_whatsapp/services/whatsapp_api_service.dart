@@ -55,9 +55,14 @@ class WhatsAppApiService {
         }
 
         // Include media if present in button templates
-        if (imageUrl != null) {
-          body["image_url"] = imageUrl;
-        } else if (documentUrl != null) {
+        if (imageUrl != null && imageUrl.isNotEmpty) {
+          if (imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.contains('document')) {
+            body["document_url"] = imageUrl;
+            body["file_name"] = fileName ?? 'Document.pdf';
+          } else {
+            body["image_url"] = imageUrl;
+          }
+        } else if (documentUrl != null && documentUrl.isNotEmpty) {
           body["document_url"] = documentUrl;
           if (fileName != null) body["file_name"] = fileName;
         }

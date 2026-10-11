@@ -67,26 +67,6 @@ class _AddProjectViewState extends State<AddProjectView> {
   bool _isInit = false;
 
   @override
-  void initState() {
-    super.initState();
-    _resolvedProject = widget.project;
-    if (_resolvedProject == null && widget.projectId != null) {
-      try {
-        final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
-        _resolvedProject = projectVM.projects.firstWhere((p) => p.id == widget.projectId);
-      } catch (_) {
-        FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get().then((doc) {
-          if (doc.exists && doc.data() != null && mounted) {
-            setState(() {
-              _resolvedProject = ProjectModel.fromMap(doc.data()!, doc.id);
-            });
-          }
-        });
-      }
-    }
-  }
-
-  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInit) {
@@ -104,8 +84,12 @@ class _AddProjectViewState extends State<AddProjectView> {
         return;
       }
 
-      if (_resolvedProject != null || widget.projectId == null) {
-        // proceed with init
+      _resolvedProject = widget.project;
+      if (_resolvedProject == null && widget.projectId != null) {
+        try {
+          final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+          _resolvedProject = projectVM.projects.firstWhere((p) => p.id == widget.projectId);
+        } catch (_) {}
       }
 
       if (_resolvedProject != null) {

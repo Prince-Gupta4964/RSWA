@@ -36,10 +36,36 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
       _nameController.text = widget.template!.title;
       _contentController.text = widget.template!.messageBody;
       _footerController.text = widget.template!.footerText ?? '';
-      _buttons.addAll(List.from(widget.template!.buttons));
+      for (var b in widget.template!.buttons) {
+        final text = b['text'] ?? '';
+        final url = b['url'] ?? b['link'] ?? '';
+        final phone = b['phone'] ?? '';
+        _buttons.add({
+          'type': b['type'] ?? 'reply',
+          'text': text,
+          'url': url,
+          'phone': phone,
+          'textCtrl': TextEditingController(text: text),
+          'urlCtrl': TextEditingController(text: url),
+          'phoneCtrl': TextEditingController(text: phone),
+        });
+      }
       _existingMediaUrl = widget.template!.mediaUrl;
       _mediaType = widget.template!.mediaType;
     }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _contentController.dispose();
+    _footerController.dispose();
+    for (var b in _buttons) {
+      (b['textCtrl'] as TextEditingController?)?.dispose();
+      (b['urlCtrl'] as TextEditingController?)?.dispose();
+      (b['phoneCtrl'] as TextEditingController?)?.dispose();
+    }
+    super.dispose();
   }
 
   void _insertVariable(String variable) {
@@ -61,18 +87,25 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
   void _addButton() {
     if (_buttons.length >= 5) return;
     setState(() {
+      final defaultText = 'Button ${_buttons.length + 1}';
       _buttons.add({
-        'type': 'reply', // 'reply', 'url', 'call', 'copy'
-        'text': 'Button ${_buttons.length + 1}',
+        'type': 'reply',
+        'text': defaultText,
         'url': '',
-        'phone': ''
+        'phone': '',
+        'textCtrl': TextEditingController(text: defaultText),
+        'urlCtrl': TextEditingController(),
+        'phoneCtrl': TextEditingController(),
       });
     });
   }
 
   void _removeButton(int index) {
     setState(() {
-      _buttons.removeAt(index);
+      final removed = _buttons.removeAt(index);
+      (removed['textCtrl'] as TextEditingController?)?.dispose();
+      (removed['urlCtrl'] as TextEditingController?)?.dispose();
+      (removed['phoneCtrl'] as TextEditingController?)?.dispose();
     });
   }
 
@@ -115,17 +148,25 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
     // Prepare JSON buttons for API compatibility
     List<Map<String, dynamic>> apiButtons = [];
     for (var b in _buttons) {
-      if (b['text'].toString().trim().isEmpty) continue;
+      final textCtrl = b['textCtrl'] as TextEditingController?;
+      final urlCtrl = b['urlCtrl'] as TextEditingController?;
+      final phoneCtrl = b['phoneCtrl'] as TextEditingController?;
+
+      final text = textCtrl?.text.trim() ?? b['text'].toString().trim();
+      final url = urlCtrl?.text.trim() ?? b['url'].toString().trim();
+      final phone = phoneCtrl?.text.trim() ?? b['phone'].toString().trim();
+
+      if (text.isEmpty) continue;
       
-      Map<String, dynamic> btn = {"text": b['text']};
+      Map<String, dynamic> btn = {"text": text};
       if (b['type'] == 'url') {
         btn["type"] = "url";
-        btn["url"] = b['url'];
+        btn["url"] = url;
+        btn["link"] = url;
       } else if (b['type'] == 'call') {
-        btn["type"] = "phone"; // Adjust based on Deropo specs if needed, commonly phone/call
-        btn["phone"] = b['phone'];
+        btn["type"] = "phone"; 
+        btn["phone"] = phone;
       }
-      // 'reply' or 'copy' might just use text if specific payload isn't known, standard is just {text:""}
       apiButtons.add(btn);
     }
 
@@ -137,8 +178,6 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
 
     try {
       if (widget.template != null) {
-        // Update existing logic could be added to ViewModel. For now just updating title/body.
-        // Needs a full update method in ViewModel for rich templates. I'll delete old and create new.
         await vm.deleteTemplate(widget.template!.id);
       }
 
@@ -169,7 +208,6 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Determine layout based on screen width (for iPad/Web)
     final bool isWideScreen = MediaQuery.of(context).size.width > 800;
 
     Widget editorContent = _buildEditor();
@@ -234,7 +272,6 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
           ),
           
           const SizedBox(height: 12),
-          // Variable Chips Box
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.blue.shade200)),
@@ -254,7 +291,7 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
                   children: [
                     _buildVarChip('{{name}}'),
                     _buildVarChip('{{phone}}'),
-                    _buildVarChip('{Hello|Hi|Hey}'), // Spintax example
+                    _buildVarChip('{Hello|Hi|Hey}'),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -287,7 +324,6 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
           ),
           const SizedBox(height: 8),
 
-          // Dynamic Buttons List
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -324,24 +360,24 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      controller: btn['textCtrl'],
                       decoration: const InputDecoration(labelText: 'Button Text', border: OutlineInputBorder(), isDense: true),
                       onChanged: (v) => setState(() => btn['text'] = v),
-                      controller: TextEditingController.fromValue(TextEditingValue(text: btn['text'], selection: TextSelection.collapsed(offset: btn['text'].toString().length))),
                     ),
                     if (btn['type'] == 'url') ...[
                       const SizedBox(height: 12),
                       TextField(
+                        controller: btn['urlCtrl'],
                         decoration: const InputDecoration(labelText: 'URL (https://...)', border: OutlineInputBorder(), isDense: true),
                         onChanged: (v) => setState(() => btn['url'] = v),
-                        controller: TextEditingController.fromValue(TextEditingValue(text: btn['url'], selection: TextSelection.collapsed(offset: btn['url'].toString().length))),
                       ),
                     ],
                     if (btn['type'] == 'call') ...[
                       const SizedBox(height: 12),
                       TextField(
+                        controller: btn['phoneCtrl'],
                         decoration: const InputDecoration(labelText: 'Phone Number (with country code)', border: OutlineInputBorder(), isDense: true),
                         onChanged: (v) => setState(() => btn['phone'] = v),
-                        controller: TextEditingController.fromValue(TextEditingValue(text: btn['phone'], selection: TextSelection.collapsed(offset: btn['phone'].toString().length))),
                       ),
                     ],
                   ],
@@ -388,10 +424,9 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
     );
   }
 
-  // --- LIVE PREVIEW UI ---
   Widget _buildPreview() {
     return Container(
-      color: const Color(0xFFE5DDD5), // WhatsApp background color
+      color: const Color(0xFFE5DDD5),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,7 +440,6 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
           ),
           const SizedBox(height: 16),
           
-          // Chat Bubble
           Align(
             alignment: Alignment.centerLeft,
             child: Container(
@@ -414,7 +448,6 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Fake Attachment
                   if (_selectedFile != null || _existingMediaUrl != null)
                     Container(
                       height: 150, width: double.infinity,
@@ -422,7 +455,6 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
                       child: const Center(child: Icon(Icons.image, color: Colors.white, size: 40)),
                     ),
                   
-                  // Message Body
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
                     child: Text(
@@ -431,14 +463,12 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
                     ),
                   ),
 
-                  // Footer
                   if (_footerController.text.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       child: Text(_footerController.text, style: const TextStyle(fontSize: 11, color: Colors.grey)),
                     ),
                   
-                  // Timestamp
                   Padding(
                     padding: const EdgeInsets.only(right: 8, bottom: 8),
                     child: Align(
@@ -453,33 +483,23 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
                       ),
                     ),
                   ),
-                  
-                  // Buttons Preview
-                  if (_buttons.isNotEmpty)
-                    Column(
-                      children: _buttons.map((b) {
-                        return Container(
-                          decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.black12))),
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (b['type'] == 'url') const Icon(Icons.link, size: 16, color: Colors.blue),
-                                if (b['type'] == 'call') const Icon(Icons.phone, size: 16, color: Colors.blue),
-                                if (b['type'] != 'reply') const SizedBox(width: 6),
-                                Text(b['text'].isEmpty ? 'Button' : b['text'], style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 14)),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    )
+
+                  if (_buttons.isNotEmpty) ...[
+                    const Divider(height: 1),
+                    ..._buttons.map((b) => Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      alignment: Alignment.center,
+                      child: Text(
+                        b['textCtrl']?.text.isNotEmpty == true ? b['textCtrl'].text : (b['text'] ?? 'Button'),
+                        style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    )),
+                  ]
                 ],
               ),
             ),
-          )
+          ),
         ],
       ),
     );

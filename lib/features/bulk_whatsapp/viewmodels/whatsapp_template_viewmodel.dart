@@ -24,6 +24,50 @@ class WhatsAppTemplateViewModel extends ChangeNotifier {
       _templates = snapshot.docs
           .map((doc) => WhatsAppTemplateModel.fromMap(doc.data(), doc.id))
           .toList();
+
+      if (_templates.isEmpty) {
+        _templates = [
+          WhatsAppTemplateModel(
+            id: 'prebuilt_1',
+            title: '🏢 Exclusive Property Launch',
+            messageBody: 'Hello {{name}}! 👋 We are excited to invite you to the grand launch of our new luxury residential project. Special pre-launch prices available for early investors!',
+            footerText: 'Property+ Real Estate',
+            buttons: [
+              {"type": "url", "text": "View Details", "url": "https://propertyplus.app"},
+              {"type": "phone", "text": "Call Agent", "phone": "919876543210"}
+            ],
+            createdByUid: userUid,
+            createdByName: 'System',
+            createdAt: DateTime.now(),
+          ),
+          WhatsAppTemplateModel(
+            id: 'prebuilt_2',
+            title: '📅 Site Visit Invitation',
+            messageBody: 'Hi {{name}}, would you like to schedule a free site visit this weekend for our premium properties? Pick up and drop service available!',
+            footerText: 'Book Your Slot Today',
+            buttons: [
+              {"type": "url", "text": "Book Visit", "url": "https://propertyplus.app/site-visit"},
+            ],
+            createdByUid: userUid,
+            createdByName: 'System',
+            createdAt: DateTime.now(),
+          ),
+          WhatsAppTemplateModel(
+            id: 'prebuilt_3',
+            title: '🎉 Festive Special Offer & Brochure',
+            messageBody: 'Dear {{name}}, unlock exclusive festive discounts on verified properties across Mumbai & Pune. Check out the attached brochure for complete pricing!',
+            footerText: 'Limited Period Offer',
+            buttons: [
+              {"type": "url", "text": "Explore Projects", "url": "https://propertyplus.app/projects"},
+            ],
+            mediaUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
+            mediaType: 'image',
+            createdByUid: userUid,
+            createdByName: 'System',
+            createdAt: DateTime.now(),
+          ),
+        ];
+      }
     } on FirebaseException catch (e) {
       if (e.code == 'failed-precondition') {
         debugPrint('Templates Index is building. Please click the link in the console to create it.');
