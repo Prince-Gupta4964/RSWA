@@ -39,7 +39,11 @@ class LeadViewModel extends ChangeNotifier {
   }
 
   LeadViewModel() {
-    _loadAllTabSettings();
+    try {
+      _loadAllTabSettings();
+    } catch (e) {
+      debugPrint('Error loading tab settings: $e');
+    }
     fetchLeads();
   }
 
