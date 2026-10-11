@@ -127,18 +127,6 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
     }
   }
 
-  Future<String?> _uploadMediaToFirebase(String uid) async {
-    if (_selectedFile == null) return _existingMediaUrl;
-    try {
-      final ref = FirebaseStorage.instance.ref().child('template_media/$uid/${DateTime.now().millisecondsSinceEpoch}_$_selectedFileName');
-      final uploadTask = await ref.putFile(_selectedFile!);
-      return await uploadTask.ref.getDownloadURL();
-    } catch (e) {
-      debugPrint('Error uploading template media: $e');
-      return null;
-    }
-  }
-
   Future<void> _saveTemplate() async {
     if (_nameController.text.trim().isEmpty || _contentController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Template Name and Content are required.')));
@@ -170,13 +158,32 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
       apiButtons.add(btn);
     }
 
-    setState(() => _isSaving = true);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚡ Template saved!')));
+      Navigator.pop(context);
+    }
+
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     final vm = Provider.of<WhatsAppTemplateViewModel>(context, listen: false);
 
-    String? finalMediaUrl = await _uploadMediaToFirebase(authVM.userUid);
+    // Background Media Upload & Save
+    _saveTemplateInBackground(authVM.userUid, authVM.userName, vm, apiButtons);
+  }
 
+  Future<void> _saveTemplateInBackground(
+    String uid,
+    String userName,
+    WhatsAppTemplateViewModel vm,
+    List<Map<String, dynamic>> apiButtons,
+  ) async {
     try {
+      String? finalMediaUrl = _existingMediaUrl;
+      if (_selectedFile != null) {
+        final ref = FirebaseStorage.instance.ref().child('template_media/$uid/${DateTime.now().millisecondsSinceEpoch}_$_selectedFileName');
+        final uploadTask = await ref.putFile(_selectedFile!);
+        finalMediaUrl = await uploadTask.ref.getDownloadURL();
+      }
+
       if (widget.template != null) {
         await vm.deleteTemplate(widget.template!.id);
       }
@@ -189,20 +196,14 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
         buttons: apiButtons,
         mediaUrl: finalMediaUrl,
         mediaType: _mediaType,
-        createdByUid: authVM.userUid,
-        createdByName: authVM.userName,
+        createdByUid: uid,
+        createdByName: userName,
         createdAt: DateTime.now(),
       );
 
       await vm.addTemplate(newTemplate);
-      
-      if (mounted) {
-        Navigator.pop(context);
-      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-    } finally {
-      setState(() => _isSaving = false);
+      debugPrint('Error saving template in background: $e');
     }
   }
 

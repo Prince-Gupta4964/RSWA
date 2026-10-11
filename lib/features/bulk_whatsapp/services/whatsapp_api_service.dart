@@ -38,15 +38,42 @@ class WhatsAppApiService {
       final formattedNumber = _formatPhoneNumber(phoneNumber);
       if (formattedNumber.isEmpty) return false;
 
+      // Handle image message via POST as per Deropo specs
+      if (type == 'image' && imageUrl != null && imageUrl.isNotEmpty) {
+        final uri = Uri.parse(_baseUrl);
+        final Map<String, dynamic> body = {
+          "number": formattedNumber,
+          "type": "image",
+          "message": message ?? "",
+          "variables": {
+            "imageUrl": imageUrl,
+          },
+          "image_url": imageUrl,
+        };
+        return await sendWhatsAppPostRequest(uri, body, _accessToken);
+      }
+
       // Handle custom rich templates with POST request
       if (type == 'buttons' && buttons != null && buttons.isNotEmpty) {
         final uri = Uri.parse(_baseUrl);
+        
+        final formattedButtons = buttons.map((b) {
+          final Map<String, dynamic> newB = Map.from(b);
+          final urlVal = newB['url'] ?? newB['link'] ?? '';
+          if (urlVal.toString().isNotEmpty) {
+            newB['type'] = 'url';
+            newB['url'] = urlVal;
+            newB['link'] = urlVal;
+          }
+          return newB;
+        }).toList();
+
         final Map<String, dynamic> body = {
           "number": formattedNumber,
           "type": "buttons",
           "message": message ?? "",
           "variables": <String, dynamic>{
-            "buttons": buttons,
+            "buttons": formattedButtons,
           }
         };
 
@@ -54,16 +81,18 @@ class WhatsAppApiService {
           body["variables"]["footer"] = footerText;
         }
 
-        // Include media if present in button templates
         if (imageUrl != null && imageUrl.isNotEmpty) {
           if (imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.contains('document')) {
             body["document_url"] = imageUrl;
+            body["variables"]["documentUrl"] = imageUrl;
             body["file_name"] = fileName ?? 'Document.pdf';
           } else {
             body["image_url"] = imageUrl;
+            body["variables"]["imageUrl"] = imageUrl;
           }
         } else if (documentUrl != null && documentUrl.isNotEmpty) {
           body["document_url"] = documentUrl;
+          body["variables"]["documentUrl"] = documentUrl;
           if (fileName != null) body["file_name"] = fileName;
         }
 
