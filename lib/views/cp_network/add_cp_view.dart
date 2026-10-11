@@ -501,7 +501,7 @@ class _AddCPViewState extends State<AddCPView> {
   Widget _buildStickyNav(bool isEditing) {
     return Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: const BoxDecoration(color: Colors.transparent), child: SafeArea(top: false, child: Row(children: [
       Expanded(flex: 1, child: _buildNavBtn(Icons.arrow_back_rounded, _focusPrevField)), const SizedBox(width: 8),
-      Expanded(flex: 4, child: GestureDetector(onDoubleTap: () => _focusNextField(isDoubleClick: true), child: ElevatedButton(onPressed: _isSaving ? null : _handleSave, style: ElevatedButton.styleFrom(backgroundColor: primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), elevation: 0, padding: const EdgeInsets.symmetric(vertical: 10)), child: _isSaving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: secondaryColor)) : Text(isEditing ? 'Update Partner' : 'Save Partner', style: const TextStyle(color: secondaryColor, fontWeight: FontWeight.bold, fontSize: 13)) ))),
+      Expanded(flex: 4, child: ElevatedButton(onPressed: _isSaving ? null : _handleSave, style: ElevatedButton.styleFrom(backgroundColor: primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), elevation: 0, padding: const EdgeInsets.symmetric(vertical: 10)), child: _isSaving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: secondaryColor)) : Text(isEditing ? 'Update Partner' : 'Save Partner', style: const TextStyle(color: secondaryColor, fontWeight: FontWeight.bold, fontSize: 13)) )),
       const SizedBox(width: 8),
       Expanded(flex: 1, child: _buildNavBtn(Icons.arrow_forward_rounded, _focusNextField)),
     ])));

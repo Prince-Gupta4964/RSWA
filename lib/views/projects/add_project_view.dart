@@ -677,13 +677,18 @@ class _AddProjectViewState extends State<AddProjectView> {
     return names.toList()..sort();
   }
 
+  String _sanitizeDocIdLocal(String name) {
+    return name.trim().replaceAll('/', '-').replaceAll('\\', '-').replaceAll(RegExp(r'\s+'), ' ');
+  }
+
   void _navigateBackOnCancelOrSave({String? targetDocId}) {
     if (_resolvedProject != null || widget.projectId != null || targetDocId != null) {
       final docId = targetDocId ?? _resolvedProject?.id ?? widget.projectId!;
+      final sanitizedDocId = _sanitizeDocIdLocal(docId);
       final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
-      final updatedProject = projectVM.projects.where((p) => p.id == docId).firstOrNull ?? _resolvedProject;
+      final updatedProject = projectVM.projects.where((p) => p.id == sanitizedDocId || p.id == docId).firstOrNull ?? _resolvedProject;
       
-      context.go('/project-detail/$docId', extra: updatedProject);
+      context.go('/project-detail/$sanitizedDocId', extra: updatedProject);
     } else {
       context.go('/projects');
     }
@@ -2888,7 +2893,7 @@ class _AddProjectViewState extends State<AddProjectView> {
             duration: const Duration(seconds: 3),
           ),
         );
-        _navigateBackOnCancelOrSave(targetDocId: _resolvedProject?.id ?? widget.projectId ?? _toTitleCase(projName));
+        _navigateBackOnCancelOrSave(targetDocId: _resolvedProject?.id ?? widget.projectId ?? _sanitizeDocIdLocal(projName));
       }
 
       // Background Async Upload

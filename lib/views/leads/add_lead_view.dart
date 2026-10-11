@@ -1147,22 +1147,19 @@ class _AddLeadViewState extends State<AddLeadView> {
             const SizedBox(width: 8),
             Expanded(
               flex: 4,
-              child: GestureDetector(
-                onDoubleTap: () => _focusNextField(isDoubleClick: true),
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _handleSave,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  child: _isSaving
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: secondaryColor))
-                      : Text(
-                      isEditing ? 'Update Client' : 'Save Client',
-                      style: const TextStyle(color: secondaryColor, fontWeight: FontWeight.bold, fontSize: 13)
-                  ),
+              child: ElevatedButton(
+                onPressed: _isSaving ? null : _handleSave,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                child: _isSaving
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: secondaryColor))
+                    : Text(
+                    isEditing ? 'Update Client' : 'Save Client',
+                    style: const TextStyle(color: secondaryColor, fontWeight: FontWeight.bold, fontSize: 13)
                 ),
               ),
             ),
@@ -1312,7 +1309,11 @@ class _AddLeadViewState extends State<AddLeadView> {
             duration: const Duration(seconds: 3),
           ),
         );
-        context.go('/dashboard');
+        if (_resolvedLead != null || widget.leadId != null) {
+          Navigator.of(context).pop();
+        } else {
+          context.go('/dashboard');
+        }
       }
 
       // Non-blocking background uploads
