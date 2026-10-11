@@ -62,93 +62,96 @@ class _CampaignDashboardScreenState extends State<CampaignDashboardScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : vm.campaigns.isEmpty
                     ? const Center(child: Text('No campaigns yet. Click "New Campaign" to start!'))
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2, // 2 columns for a tablet/desktop, can be responsive
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          mainAxisExtent: 220,
-                        ),
-                        itemCount: vm.campaigns.length,
-                        itemBuilder: (context, index) {
-                          final c = vm.campaigns[index];
-                          final progressPercent = (c.progress * 100).toStringAsFixed(0);
-                          
-                          return Card(
-                            elevation: 2,
-                            color: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // Top Header Bar
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  decoration: const BoxDecoration(
-                                    gradient: LinearGradient(colors: [Color(0xFF9E5CFF), Color(0xFF6B1BFF)]),
-                                    borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          c.name,
-                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final bool isMobile = constraints.maxWidth < 700;
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: isMobile ? 1 : 2,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              mainAxisExtent: isMobile ? 170 : 220,
+                            ),
+                            itemCount: vm.campaigns.length,
+                            itemBuilder: (context, index) {
+                              final c = vm.campaigns[index];
+                              final progressPercent = (c.progress * 100).toStringAsFixed(0);
+                              
+                              return Card(
+                                elevation: 2,
+                                color: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    // Top Header Bar
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: const BoxDecoration(
+                                        gradient: LinearGradient(colors: [Color(0xFF9E5CFF), Color(0xFF6B1BFF)]),
+                                        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
                                       ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              c.status == 'Completed' ? Icons.check_circle_outline : Icons.sync, 
-                                              color: Colors.white, size: 14
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(c.status.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      InkWell(
-                                        onTap: () => vm.deleteCampaign(c.id),
-                                        child: const Icon(Icons.delete, color: Colors.white70, size: 18),
-                                      )
-                                    ],
-                                  ),
-                                ),
-                                // Progress Bar
-                                Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
+                                      child: Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          const Text('Progress', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                                          Text('$progressPercent%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                          Expanded(
+                                            child: Text(
+                                              c.name,
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black,
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  c.status == 'Completed' ? Icons.check_circle_outline : Icons.sync, 
+                                                  color: Colors.white, size: 14
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(c.status.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          InkWell(
+                                            onTap: () => vm.deleteCampaign(c.id),
+                                            child: const Icon(Icons.delete, color: Colors.white70, size: 18),
+                                          )
                                         ],
                                       ),
-                                      const SizedBox(height: 6),
-                                      LinearProgressIndicator(
-                                        value: c.progress,
-                                        backgroundColor: Colors.grey.shade200,
-                                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF7A3BFF)),
-                                        minHeight: 6,
-                                        borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    // Progress Bar
+                                    Padding(
+                                      padding: const EdgeInsets.all(12.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              const Text('Progress', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                              Text('$progressPercent%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 6),
+                                          LinearProgressIndicator(
+                                            value: c.progress,
+                                            backgroundColor: Colors.grey.shade200,
+                                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF7A3BFF)),
+                                            minHeight: 6,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                ),
+                                    ),
                                 // Stats Grid
                                 Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 12.0),
