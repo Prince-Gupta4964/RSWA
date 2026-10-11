@@ -15,15 +15,26 @@ class WhatsAppTemplateViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final snapshot = await _firestore
-          .collection('whatsapp_templates')
-          .where('createdByUid', isEqualTo: userUid)
-          .orderBy('createdAt', descending: true)
-          .get();
+      QuerySnapshot<Map<String, dynamic>> snapshot;
+      try {
+        snapshot = await _firestore
+            .collection('whatsapp_templates')
+            .where('createdByUid', isEqualTo: userUid)
+            .orderBy('createdAt', descending: true)
+            .get();
+      } catch (e) {
+        debugPrint('Index query failed, falling back to simple query: $e');
+        snapshot = await _firestore
+            .collection('whatsapp_templates')
+            .where('createdByUid', isEqualTo: userUid)
+            .get();
+      }
 
       _templates = snapshot.docs
           .map((doc) => WhatsAppTemplateModel.fromMap(doc.data(), doc.id))
           .toList();
+
+      _templates.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       if (_templates.isEmpty) {
         _templates = [
