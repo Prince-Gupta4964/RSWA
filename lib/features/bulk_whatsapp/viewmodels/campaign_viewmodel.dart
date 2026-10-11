@@ -17,22 +17,26 @@ class CampaignViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final snapshot = await _firestore
-          .collection('whatsapp_campaigns')
-          .where('createdByUid', isEqualTo: userUid)
-          .orderBy('createdAt', descending: true)
-          .get();
+      QuerySnapshot<Map<String, dynamic>> snapshot;
+      try {
+        snapshot = await _firestore
+            .collection('whatsapp_campaigns')
+            .where('createdByUid', isEqualTo: userUid)
+            .orderBy('createdAt', descending: true)
+            .get();
+      } catch (e) {
+        debugPrint('Campaigns index query failed, falling back to simple query: $e');
+        snapshot = await _firestore
+            .collection('whatsapp_campaigns')
+            .where('createdByUid', isEqualTo: userUid)
+            .get();
+      }
 
       _campaigns = snapshot.docs
           .map((doc) => CampaignModel.fromMap(doc.data(), doc.id))
           .toList();
-    } on FirebaseException catch (e) {
-      if (e.code == 'failed-precondition') {
-        debugPrint('Index is still building. The campaigns will load once it is complete.');
-        // Ignore the error so it doesn't break the app flow
-      } else {
-        debugPrint('Error fetching campaigns: $e');
-      }
+
+      _campaigns.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     } catch (e) {
       debugPrint('Error fetching campaigns: $e');
     } finally {
@@ -62,8 +66,8 @@ class CampaignViewModel extends ChangeNotifier {
     String? fileName,
     List<Map<String, dynamic>>? buttons,
     String? footerText,
-    int delayMin = 1,
-    int delayMax = 3,
+    int delayMin = 0,
+    int delayMax = 1,
   }) async {
     final int total = targets.length;
     

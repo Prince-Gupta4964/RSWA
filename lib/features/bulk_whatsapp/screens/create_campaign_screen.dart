@@ -31,8 +31,8 @@ class _CreateCampaignScreenState extends State<CreateCampaignScreen> {
   
   WhatsAppTemplateModel? _selectedAppTemplate;
   
-  int _delayMin = 1;
-  int _delayMax = 3;
+  int _delayMin = 0;
+  int _delayMax = 1;
 
   final Set<String> _selectedLeadIds = {};
   bool _isUploading = false;
@@ -382,7 +382,7 @@ class _CreateCampaignScreenState extends State<CreateCampaignScreen> {
                           initialValue: _delayMin.toString(),
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(labelText: 'Random Delay Min (sec)', border: OutlineInputBorder(), filled: true, fillColor: Colors.white),
-                          onChanged: (val) => _delayMin = int.tryParse(val) ?? 1,
+                          onChanged: (val) => _delayMin = int.tryParse(val) ?? 0,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -391,7 +391,7 @@ class _CreateCampaignScreenState extends State<CreateCampaignScreen> {
                           initialValue: _delayMax.toString(),
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(labelText: 'Random Delay Max (sec)', border: OutlineInputBorder(), filled: true, fillColor: Colors.white),
-                          onChanged: (val) => _delayMax = int.tryParse(val) ?? 3,
+                          onChanged: (val) => _delayMax = int.tryParse(val) ?? 1,
                         ),
                       ),
                     ],
