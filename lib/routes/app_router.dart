@@ -283,6 +283,21 @@ class AppRouter {
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
+        path: '/add-cp/:cpId',
+        builder: (context, state) {
+          final cpId = state.pathParameters['cpId'];
+          CPModel? cp = state.extra as CPModel?;
+          if (cp == null && cpId != null && cpId != 'new') {
+             try {
+               final cpVM = Provider.of<CPViewModel>(context, listen: false);
+               cp = cpVM.cps.firstWhere((c) => c.id == cpId);
+             } catch (_) {}
+          }
+          return AuthGuard(child: AddCPView(cp: cp, cpId: cpId != 'new' ? cpId : null));
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/cp-detail/:cpId',
         builder: (context, state) {
           final cpId = state.pathParameters['cpId'];

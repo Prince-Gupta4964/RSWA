@@ -68,13 +68,33 @@ class CPViewModel extends ChangeNotifier {
     });
   }
 
+  Map<String, dynamic> _sanitizeMap(Map<String, dynamic> input) {
+    final Map<String, dynamic> output = {};
+    input.forEach((key, value) {
+      if (value is DateTime) {
+        output[key] = Timestamp.fromDate(value);
+      } else if (value is Map) {
+        output[key] = _sanitizeMap(Map<String, dynamic>.from(value));
+      } else if (value is List) {
+        output[key] = value.where((item) => item != null && (item is String || item is num || item is bool || item is Timestamp || item is Map || item is DateTime)).map((item) {
+          if (item is DateTime) return Timestamp.fromDate(item);
+          if (item is Map) return _sanitizeMap(Map<String, dynamic>.from(item));
+          return item;
+        }).toList();
+      } else if (value is String || value is num || value is bool || value is Timestamp || value is FieldValue) {
+        output[key] = value;
+      }
+    });
+    return output;
+  }
+
   // Naya CP Add aur Update karne ka function (RERA ID aur saare fields ke sath)
   Future<void> addOrUpdateCP(
     Map<String, dynamic> cpData, {
     String? id,
     Map<String, dynamic>? actorMetadata,
   }) async {
-    final Map<String, dynamic> data = Map.from(cpData);
+    final Map<String, dynamic> data = _sanitizeMap(cpData);
     
     data['role'] = 'cp';
     data['isActive'] = (data['status'] ?? '').toString().toLowerCase() != 'inactive';
@@ -91,7 +111,7 @@ class CPViewModel extends ChangeNotifier {
     }
 
     if (id != null && id.isNotEmpty) {
-      await _db.collection('cps').doc(id).update(data);
+      await _db.collection('cps').doc(id).set(data, SetOptions(merge: true));
     } else {
       data['timestamp'] = FieldValue.serverTimestamp();
       if (actorMetadata != null) {

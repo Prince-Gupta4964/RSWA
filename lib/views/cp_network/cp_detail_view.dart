@@ -232,7 +232,7 @@ class _CPDetailViewState extends State<CPDetailView> {
             ),
           ),
         ),
-        floatingActionButton: FloatingActionButton(backgroundColor: const Color(0xFFFF6B22), onPressed: () => context.push('/add-cp', extra: widget.cp), child: const Icon(Icons.edit, color: Colors.white)),
+        floatingActionButton: FloatingActionButton(backgroundColor: const Color(0xFFFF6B22), onPressed: () => context.push('/add-cp/${widget.cp.id}', extra: widget.cp), child: const Icon(Icons.edit, color: Colors.white)),
       ),
     );
   }

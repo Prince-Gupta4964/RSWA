@@ -19,7 +19,8 @@ import '../../utils/role_permissions.dart';
 
 class AddCPView extends StatefulWidget {
   final CPModel? cp;
-  const AddCPView({super.key, this.cp});
+  final String? cpId;
+  const AddCPView({super.key, this.cp, this.cpId});
 
   @override
   State<AddCPView> createState() => _AddCPViewState();
@@ -28,6 +29,7 @@ class AddCPView extends StatefulWidget {
 class _AddCPViewState extends State<AddCPView> {
   bool _isSaving = false;
   final Set<String> _expandedSections = {'Basic Info'};
+  CPModel? _resolvedCP;
 
   final Map<String, dynamic> _formData = {};
   final Map<String, TextEditingController> _controllers = {};
@@ -49,11 +51,18 @@ class _AddCPViewState extends State<AddCPView> {
   @override
   void initState() {
     super.initState();
+    _resolvedCP = widget.cp;
+    if (_resolvedCP == null && widget.cpId != null) {
+      try {
+        final cpVM = Provider.of<CPViewModel>(context, listen: false);
+        _resolvedCP = cpVM.cps.firstWhere((c) => c.id == widget.cpId);
+      } catch (_) {}
+    }
     _initializeData();
   }
 
   void _initializeData() {
-    final existingData = widget.cp?.rawData ?? {};
+    final existingData = _resolvedCP?.rawData ?? {};
     _formData['partnerType'] = existingData['partnerType'] ?? ''; 
     _formData['source'] = existingData['source'] ?? 'Walk In';
     _formData['status'] = existingData['status'] ?? 'Active Partner';
@@ -62,7 +71,7 @@ class _AddCPViewState extends State<AddCPView> {
     _formData['level'] = existingData['level'] ?? 'Scout (1%)';
 
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
-    if (widget.cp == null) {
+    if (_resolvedCP == null) {
       _formData['advisor'] = authVM.userName;
       _formData['caller'] = authVM.userName;
       _formData['reachedBy'] = authVM.userName;
@@ -74,7 +83,7 @@ class _AddCPViewState extends State<AddCPView> {
 
     _initializeFieldsLocal(existingData);
 
-    if (widget.cp == null) {
+    if (_resolvedCP == null) {
       final now = DateTime.now();
       _formData['timestamp'] = now;
       _controllers['timestamp']?.text = DateFormat('dd MMM yyyy, hh:mm a').format(now);
@@ -101,7 +110,7 @@ class _AddCPViewState extends State<AddCPView> {
       // 🚀 NAYA: Handle Referral Link (?ref=Name)
       final state = GoRouterState.of(context);
       final String? refFromLink = state.uri.queryParameters['ref'];
-      if (refFromLink != null && refFromLink.isNotEmpty && widget.cp == null) {
+      if (refFromLink != null && refFromLink.isNotEmpty && _resolvedCP == null) {
         setState(() {
           _formData['source'] = 'Referral';
           _formData['referralName1'] = refFromLink;
@@ -638,7 +647,7 @@ class _AddCPViewState extends State<AddCPView> {
     final cpVM = Provider.of<CPViewModel>(context, listen: false);
     final currentPhones = getPhoneNumbers(_formData);
     final currentEmails = getEmails(_formData);
-    final String? currentCPId = widget.cp?.id;
+    final String? currentCPId = _resolvedCP?.id ?? widget.cpId;
 
     for (var existingCP in cpVM.cps) {
       if (currentCPId != null && existingCP.id == currentCPId) continue;
@@ -683,8 +692,8 @@ class _AddCPViewState extends State<AddCPView> {
       final authVM = Provider.of<AuthViewModel>(context, listen: false);
       final String folderName = '${_formData['cpName'] ?? 'cp'}_${DateTime.now().millisecondsSinceEpoch}';
 
-      _formData['cpID'] = widget.cp?.rawData['cpID'] ?? _generateUniqueIDLocal();
-      if (widget.cp == null) {
+      _formData['cpID'] = _resolvedCP?.rawData['cpID'] ?? widget.cp?.rawData['cpID'] ?? _generateUniqueIDLocal();
+      if (_resolvedCP == null) {
         _formData['isApproved'] = true;
         _formData['timestamp'] = FieldValue.serverTimestamp();
         _formData['createdBy'] = authVM.userName;
@@ -697,7 +706,7 @@ class _AddCPViewState extends State<AddCPView> {
       // Save CP Document to Firestore first (instant!)
       await cpVM.addOrUpdateCP(
         _formData,
-        id: widget.cp?.id,
+        id: _resolvedCP?.id ?? widget.cpId,
         actorMetadata: authVM.actorMetadata,
       );
 
@@ -717,8 +726,8 @@ class _AddCPViewState extends State<AddCPView> {
       }
 
       // Non-blocking background uploads
-      if (widget.cp?.id != null || cpVM.cps.isNotEmpty) {
-        final targetDocId = widget.cp?.id ?? cpVM.cps.first.id;
+      if (_resolvedCP?.id != null || widget.cpId != null || cpVM.cps.isNotEmpty) {
+        final targetDocId = _resolvedCP?.id ?? widget.cpId ?? cpVM.cps.first.id;
         _uploadCPMediaInBackground(targetDocId, Map.from(_pickedImages), folderName);
       }
     } catch (e) {
