@@ -58,6 +58,27 @@ class _AddLeadViewState extends State<AddLeadView> {
   bool _isInit = false;
 
   @override
+  void initState() {
+    super.initState();
+    _resolvedLead = widget.lead;
+    if (_resolvedLead == null && widget.leadId != null) {
+      try {
+        final leadVM = Provider.of<LeadViewModel>(context, listen: false);
+        _resolvedLead = leadVM.leads.firstWhere((l) => l.id == widget.leadId);
+      } catch (_) {
+        FirebaseFirestore.instance.collection('leads').doc(widget.leadId).get().then((doc) {
+          if (doc.exists && doc.data() != null && mounted) {
+            setState(() {
+              _resolvedLead = LeadModel.fromMap(doc.data()!, doc.id);
+              _initializeData();
+            });
+          }
+        });
+      }
+    }
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInit) {
@@ -74,19 +95,13 @@ class _AddLeadViewState extends State<AddLeadView> {
         });
         return;
       }
-      _initializeData();
+      if (_resolvedLead != null || widget.leadId == null) {
+        _initializeData();
+      }
     }
   }
 
   void _initializeData() {
-    _resolvedLead = widget.lead;
-    if (_resolvedLead == null && widget.leadId != null) {
-      try {
-        final leadVM = Provider.of<LeadViewModel>(context, listen: false);
-        _resolvedLead = leadVM.leads.firstWhere((l) => l.id == widget.leadId);
-      } catch (_) {}
-    }
-
     final existingData = _resolvedLead?.rawData ?? {};
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
 

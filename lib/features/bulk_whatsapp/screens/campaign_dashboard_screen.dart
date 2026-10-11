@@ -152,19 +152,19 @@ class _CampaignDashboardScreenState extends State<CampaignDashboardScreen> {
                                         ],
                                       ),
                                     ),
-                                // Stats Grid
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      _StatBox(label: 'Total', value: c.total, color: Colors.grey.shade800, bgColor: Colors.grey.shade100),
-                                      _StatBox(label: 'Sent', value: c.sent, color: Colors.green.shade700, bgColor: Colors.green.shade50),
-                                      _StatBox(label: 'Pending', value: c.pending, color: Colors.orange.shade700, bgColor: Colors.orange.shade50),
-                                      _StatBox(label: 'Failed', value: c.failed, color: Colors.red.shade700, bgColor: Colors.red.shade50),
-                                    ],
-                                  ),
-                                ),
+                                    // Stats Grid
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          _StatBox(label: 'Total', value: c.total, color: Colors.grey.shade800, bgColor: Colors.grey.shade100),
+                                          _StatBox(label: 'Sent', value: c.sent, color: Colors.green.shade700, bgColor: Colors.green.shade50),
+                                          _StatBox(label: 'Pending', value: c.pending, color: Colors.orange.shade700, bgColor: Colors.orange.shade50),
+                                          _StatBox(label: 'Failed', value: c.failed, color: Colors.red.shade700, bgColor: Colors.red.shade50),
+                                        ],
+                                      ),
+                                    ),
                               ],
                             ),
                           );
