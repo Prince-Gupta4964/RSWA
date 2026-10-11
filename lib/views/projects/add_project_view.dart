@@ -678,7 +678,8 @@ class _AddProjectViewState extends State<AddProjectView> {
   }
 
   String _sanitizeDocIdLocal(String name) {
-    return name.trim().replaceAll('/', '-').replaceAll('\\', '-').replaceAll(RegExp(r'\s+'), ' ');
+    if (name.trim().isEmpty) return 'unnamed-project';
+    return name.trim().toLowerCase().replaceAll('/', '-').replaceAll('\\', '-').replaceAll(RegExp(r'\s+'), '-');
   }
 
   void _navigateBackOnCancelOrSave({String? targetDocId}) {

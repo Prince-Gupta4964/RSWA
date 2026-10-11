@@ -17,8 +17,8 @@ class ProjectViewModel extends ChangeNotifier {
   }
 
   String _sanitizeDocId(String name) {
-    if (name.trim().isEmpty) return 'Unnamed Project';
-    return name.trim().replaceAll('/', '-').replaceAll('\\', '-').replaceAll(RegExp(r'\s+'), ' ');
+    if (name.trim().isEmpty) return 'unnamed-project';
+    return name.trim().toLowerCase().replaceAll('/', '-').replaceAll('\\', '-').replaceAll(RegExp(r'\s+'), '-');
   }
 
   bool _isMigrating = false;
