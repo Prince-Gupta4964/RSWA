@@ -25,6 +25,13 @@ class CPViewModel extends ChangeNotifier {
   }
 
   void fetchCPs() {
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
+    });
+
     List<CPModel> cpsList = [];
     List<CPModel> customersList = [];
 

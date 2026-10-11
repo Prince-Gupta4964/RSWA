@@ -44,7 +44,6 @@ class WhatsAppApiService {
           final Map<String, dynamic> newB = Map.from(b);
           final urlVal = newB['url'] ?? newB['link'] ?? '';
           if (urlVal.toString().isNotEmpty) {
-            newB['type'] = 'url';
             newB['url'] = urlVal;
             newB['link'] = urlVal;
           }
@@ -64,16 +63,22 @@ class WhatsAppApiService {
           body["variables"]["footer"] = footerText;
         }
 
-        // Include media if present in button templates
+        // Include media if present in button templates (with both snake_case and camelCase for Deropo API compatibility)
         if (imageUrl != null && imageUrl.isNotEmpty) {
           if (imageUrl.toLowerCase().endsWith('.pdf') || imageUrl.contains('document')) {
             body["document_url"] = imageUrl;
+            body["variables"]["document_url"] = imageUrl;
+            body["variables"]["documentUrl"] = imageUrl;
             body["file_name"] = fileName ?? 'Document.pdf';
           } else {
             body["image_url"] = imageUrl;
+            body["variables"]["image_url"] = imageUrl;
+            body["variables"]["imageUrl"] = imageUrl;
           }
         } else if (documentUrl != null && documentUrl.isNotEmpty) {
           body["document_url"] = documentUrl;
+          body["variables"]["document_url"] = documentUrl;
+          body["variables"]["documentUrl"] = documentUrl;
           if (fileName != null) body["file_name"] = fileName;
         }
 
@@ -91,10 +96,12 @@ class WhatsAppApiService {
         params['message'] = message;
       }
 
-      if (type == 'image' && imageUrl != null) {
+      if (type == 'image' && imageUrl != null && imageUrl.isNotEmpty) {
         params['image_url'] = imageUrl;
-      } else if (type == 'document' && documentUrl != null) {
+        params['imageUrl'] = imageUrl;
+      } else if (type == 'document' && documentUrl != null && documentUrl.isNotEmpty) {
         params['document_url'] = documentUrl;
+        params['documentUrl'] = documentUrl;
         if (fileName != null) params['file_name'] = fileName;
       } else if (type == 'template' && templateId != null) {
         params['template_id'] = templateId;

@@ -18,6 +18,13 @@ class BuilderViewModel extends ChangeNotifier {
   }
 
   void fetchBuilders() {
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
+    });
+
     // Listen to standard builders
     _db.collection('builders').snapshots().listen((snapshot) {
       _standardBuilders = snapshot.docs.map((doc) => BuilderModel.fromMap(doc.data(), doc.id, collection: 'builders')).toList();

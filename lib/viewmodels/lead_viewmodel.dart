@@ -185,6 +185,13 @@ class LeadViewModel extends ChangeNotifier {
   }
 
   void fetchLeads() {
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
+    });
+
     _db
         .collection('leads')
         .snapshots()

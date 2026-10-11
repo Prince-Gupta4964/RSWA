@@ -61,6 +61,13 @@ class ProjectViewModel extends ChangeNotifier {
   }
 
   void fetchProjects() {
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
+    });
+
     _db
         .collection('projects')
         .snapshots()
