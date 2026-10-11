@@ -1,4 +1,4 @@
-package com.example.rswa
+package com.atech.propertyplus
 
 import io.flutter.embedding.android.FlutterActivity
 

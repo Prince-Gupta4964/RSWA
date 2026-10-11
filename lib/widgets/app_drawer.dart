@@ -84,7 +84,7 @@ class AppDrawer extends StatelessWidget {
             ],
             
             // Referral Link (For CPs and Admins)
-            if (authVM.appRole == AppRole.cp || authVM.canManageUsers)
+            if (authVM.appRole == AppRole.cp || authVM.canManageUsers) ...[
               ListTile(
                 leading: const Icon(Icons.share_outlined, color: Color(0xFFFF6B22)),
                 title: const Text('Share Referral Link', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -99,6 +99,17 @@ class AppDrawer extends StatelessWidget {
                   );
                 },
               ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.rocket_launch_rounded, color: Color(0xFF7A3BFF)),
+                title: const Text('WhatsApp Campaigns', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Bulk sender with media & templates', style: TextStyle(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/whatsapp-campaigns');
+                },
+              ),
+            ],
 
             // Standard Navigation
             ListTile(
@@ -144,6 +155,18 @@ class AppDrawer extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(context);
                   context.push('/dropdown-manager');
+                },
+              ),
+
+            // Restricted: Form Labels & Column Manager (Super Admin only)
+            if (authVM.isSuperAdmin)
+              ListTile(
+                leading: const Icon(Icons.edit_note_rounded, color: Color(0xFFFF6B22)),
+                title: const Text('Form Labels & Column Manager', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Customize form names, types & visibility', style: TextStyle(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/form-labels-manager');
                 },
               ),
 

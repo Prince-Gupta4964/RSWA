@@ -59,6 +59,7 @@ class AuthViewModel extends ChangeNotifier {
   bool get canManageUsers => permissions.canManageUsers;
   bool get canConfigureForms => permissions.canConfigureForms;
   bool get canConfigureTabs => permissions.canConfigureTabs;
+  bool get isSuperAdmin => appRole == AppRole.superAdmin;
 
   bool _allowNotifications = true;
   bool get allowNotifications => _allowNotifications;

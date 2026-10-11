@@ -22,7 +22,8 @@ import '../../services/youtube_upload_service.dart';
 
 class AddProjectView extends StatefulWidget {
   final ProjectModel? project;
-  const AddProjectView({super.key, this.project});
+  final String? projectId;
+  const AddProjectView({super.key, this.project, this.projectId});
 
   @override
   State<AddProjectView> createState() => _AddProjectViewState();
@@ -31,6 +32,13 @@ class AddProjectView extends StatefulWidget {
 class _AddProjectViewState extends State<AddProjectView> {
   static const Color primaryColor = Color(0xFFFBE64E);
   static const Color secondaryColor = Color(0xFF6B5800);
+
+  ProjectModel? _resolvedProject;
+
+  List<Map<String, dynamic>> get _formStructure {
+    final configVM = Provider.of<AppConfigurationViewModel>(context);
+    return configVM.getFormStructure('Project Form', ProjectFormStrings.formStructure);
+  }
 
   final Map<String, dynamic> _formData = {};
   final Map<String, TextEditingController> _controllers = {};
@@ -56,131 +64,144 @@ class _AddProjectViewState extends State<AddProjectView> {
   final Map<String, int> _activeChipIndex = {};
   final Map<String, GlobalKey> _sectionKeys = {}; // 🚀 NAYA
 
+  bool _isInit = false;
+
   @override
-  void initState() {
-    super.initState();
-    final authVM = Provider.of<AuthViewModel>(context, listen: false);
-    if (authVM.appRole == AppRole.cp && !authVM.isApproved) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Your account is pending admin approval.'), backgroundColor: Colors.red),
-          );
-          context.go('/dashboard');
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInit) {
+      _isInit = true;
+      final authVM = Provider.of<AuthViewModel>(context, listen: false);
+      if (authVM.appRole == AppRole.cp && !authVM.isApproved) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Your account is pending admin approval.'), backgroundColor: Colors.red),
+            );
+            context.go('/dashboard');
+          }
+        });
+        return;
+      }
+
+      _resolvedProject = widget.project;
+      if (_resolvedProject == null && widget.projectId != null) {
+        try {
+          final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+          _resolvedProject = projectVM.projects.firstWhere((p) => p.id == widget.projectId);
+        } catch (_) {}
+      }
+
+      if (_resolvedProject != null) {
+        if (authVM.appRole == AppRole.cp) {
+          final project = _resolvedProject!;
+          final String myUid = authVM.userUid.trim();
+          final String myName = authVM.userName.trim().toLowerCase();
+          final String myContact = (authVM.userData?['contactNo'] ?? '').toString().trim();
+
+          final String cUid = (project.createdByUid ?? '').trim();
+          final cb = project.rawData['createdBy'];
+          final String cbUid = (cb is Map ? cb['uid'] ?? '' : '').toString().trim();
+          final String cbName = (cb is Map ? cb['name'] ?? '' : '').toString().trim().toLowerCase();
+          final String addedBy = (project.rawData['addedBy'] ?? '').toString().trim().toLowerCase();
+          final String projContact = (project.rawData['contactNo'] ?? project.propertyDetails['contactNo'] ?? '').toString().trim();
+
+          bool isMine = (myUid.isNotEmpty && (cUid == myUid || cbUid == myUid)) ||
+              (myName.isNotEmpty && (cbName == myName || addedBy == myName || (project.rawData['createdBy']?.toString().toLowerCase() == myName))) ||
+              (myContact.isNotEmpty && projContact.isNotEmpty && projContact == myContact);
+
+          if (!isMine) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('You can only edit projects added by yourself.'), backgroundColor: Colors.red),
+                );
+                context.pop();
+              }
+            });
+            return;
+          }
         }
-      });
-      return;
-    }
 
-    if (widget.project != null) {
-      if (authVM.appRole == AppRole.cp) {
-        final project = widget.project!;
-        final String myUid = authVM.userUid.trim();
-        final String myName = authVM.userName.trim().toLowerCase();
-        final String myContact = (authVM.userData?['contactNo'] ?? '').toString().trim();
+        _formData.addAll(_resolvedProject!.rawData);
+        if (_resolvedProject!.propertyDetails.isNotEmpty) {
+          _formData.addAll(_resolvedProject!.propertyDetails);
+        }
 
-        final String cUid = (project.createdByUid ?? '').trim();
-        final cb = project.rawData['createdBy'];
-        final String cbUid = (cb is Map ? cb['uid'] ?? '' : '').toString().trim();
-        final String cbName = (cb is Map ? cb['name'] ?? '' : '').toString().trim().toLowerCase();
-        final String addedBy = (project.rawData['addedBy'] ?? '').toString().trim().toLowerCase();
-        final String projContact = (project.rawData['contactNo'] ?? project.propertyDetails['contactNo'] ?? '').toString().trim();
-
-        bool isMine = (myUid.isNotEmpty && (cUid == myUid || cbUid == myUid)) ||
-            (myName.isNotEmpty && (cbName == myName || addedBy == myName || (project.rawData['createdBy']?.toString().toLowerCase() == myName))) ||
-            (myContact.isNotEmpty && projContact.isNotEmpty && projContact == myContact);
-
-        if (!isMine) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('You can only edit projects added by yourself.'), backgroundColor: Colors.red),
-              );
-              context.pop();
-            }
-          });
-          return;
+        // 🚀 Discard legacy non-YouTube (Firebase Storage) video URLs
+        final String existingVideo = (_formData['projectVideo'] ?? '').toString().trim();
+        if (existingVideo.isNotEmpty && !existingVideo.contains('youtube.com') && !existingVideo.contains('youtu.be')) {
+          _formData['projectVideo'] = '';
         }
       }
 
-      _formData.addAll(widget.project!.rawData);
-      if (widget.project!.propertyDetails.isNotEmpty) {
-        _formData.addAll(widget.project!.propertyDetails);
+      _formData['isReraApproved'] = _formData['isReraApproved'] ?? 'No';
+      _formData['isTitleClear'] = _formData['isTitleClear'] ?? 'No';
+      _formData['isLegallyVerified'] = _formData['isLegallyVerified'] ?? 'No';
+      
+      if (_formData['projectStatus'] == null) {
+        if (_formData['isHold'] == 'Yes' || _formData['isHold'] == true) {
+          _formData['projectStatus'] = 'Hold';
+        } else if (_formData['isBlock'] == 'Yes' || _formData['isBlock'] == true) {
+          _formData['projectStatus'] = 'Block';
+        } else if (_formData['alreadyExists'] == 'Yes' || _formData['alreadyExists'] == true) {
+          _formData['projectStatus'] = 'Already Exists';
+        } else if (_formData['isJunk'] == 'Yes' || _formData['isJunk'] == true) {
+          _formData['projectStatus'] = 'Junk';
+        } else if (_formData['isOthers'] == 'Yes' || _formData['isOthers'] == true) {
+          _formData['projectStatus'] = 'Others';
+        } else {
+          _formData['projectStatus'] = 'Stack';
+        }
       }
-
-      // 🚀 Discard legacy non-YouTube (Firebase Storage) video URLs
-      final String existingVideo = (_formData['projectVideo'] ?? '').toString().trim();
-      if (existingVideo.isNotEmpty && !existingVideo.contains('youtube.com') && !existingVideo.contains('youtu.be')) {
-        _formData['projectVideo'] = '';
-      }
-    }
-
-    _formData['isReraApproved'] = _formData['isReraApproved'] ?? 'No';
-    _formData['isTitleClear'] = _formData['isTitleClear'] ?? 'No';
-    _formData['isLegallyVerified'] = _formData['isLegallyVerified'] ?? 'No';
-    
-    if (_formData['projectStatus'] == null) {
-      if (_formData['isHold'] == 'Yes' || _formData['isHold'] == true) {
-        _formData['projectStatus'] = 'Hold';
-      } else if (_formData['isBlock'] == 'Yes' || _formData['isBlock'] == true) {
-        _formData['projectStatus'] = 'Block';
-      } else if (_formData['alreadyExists'] == 'Yes' || _formData['alreadyExists'] == true) {
-        _formData['projectStatus'] = 'Already Exists';
-      } else if (_formData['isJunk'] == 'Yes' || _formData['isJunk'] == true) {
-        _formData['projectStatus'] = 'Junk';
-      } else if (_formData['isOthers'] == 'Yes' || _formData['isOthers'] == true) {
-        _formData['projectStatus'] = 'Others';
+      
+      if (_resolvedProject == null) {
+        _formData['isApproved'] = 'No';
       } else {
-        _formData['projectStatus'] = 'Stack';
+        _formData['isApproved'] = _formData['isApproved'] ?? 'No';
       }
-    }
-    
-    if (widget.project == null) {
-      _formData['isApproved'] = 'No';
-    } else {
-      _formData['isApproved'] = _formData['isApproved'] ?? 'No';
-    }
-    
-    _formData['alreadyExists'] = _formData['alreadyExists'] ?? 'No';
-    _formData['likeButton'] = _formData['likeButton'] == true;
-    _formData['adminRating'] = int.tryParse(_formData['adminRating']?.toString() ?? '0') ?? 0;
-    _formData['peopleRating'] = int.tryParse(_formData['peopleRating']?.toString() ?? '0') ?? 0;
-    _selectedBuilderIds = List<String>.from(_formData['builderIds'] ?? []);
 
-    // 🚀 NAYA: Initialize custom attachments
-    if (_formData['otherAttachments'] is List) {
-      final list = _formData['otherAttachments'] as List;
-      for (var item in list) {
-        if (item is Map) {
-          final title = (item['title'] ?? '').toString();
-          final url = (item['url'] ?? item['file'] ?? '').toString();
-          _customAttachmentRows.add({
-            'titleCtrl': TextEditingController(text: title),
-            'file': null,
-            'existingUrl': url.isNotEmpty ? url : null,
-          });
+      _formData['alreadyExists'] = _formData['alreadyExists'] ?? 'No';
+      _formData['likeButton'] = _formData['likeButton'] == true;
+      _formData['adminRating'] = int.tryParse(_formData['adminRating']?.toString() ?? '0') ?? 0;
+      _formData['peopleRating'] = int.tryParse(_formData['peopleRating']?.toString() ?? '0') ?? 0;
+      _selectedBuilderIds = List<String>.from(_formData['builderIds'] ?? []);
+
+      // 🚀 NAYA: Initialize custom attachments
+      if (_formData['otherAttachments'] is List) {
+        final list = _formData['otherAttachments'] as List;
+        for (var item in list) {
+          if (item is Map) {
+            final title = (item['title'] ?? '').toString();
+            final url = (item['url'] ?? item['file'] ?? '').toString();
+            _customAttachmentRows.add({
+              'titleCtrl': TextEditingController(text: title),
+              'file': null,
+              'existingUrl': url.isNotEmpty ? url : null,
+            });
+          }
         }
       }
-    }
-    if (_customAttachmentRows.isEmpty) {
-      _customAttachmentRows.add({
-        'titleCtrl': TextEditingController(),
-        'file': null,
-        'existingUrl': null,
-      });
-    }
+      if (_customAttachmentRows.isEmpty) {
+        _customAttachmentRows.add({
+          'titleCtrl': TextEditingController(),
+          'file': null,
+          'existingUrl': null,
+        });
+      }
 
-    _initializeAllControllers(_formData);
+      _initializeAllControllers(_formData);
 
-    if (widget.project == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _navigateToField('propertyName');
-      });
+      if (widget.project == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _navigateToField('propertyName');
+        });
+      }
     }
   }
 
   void _initializeAllControllers(Map<String, dynamic> data) {
-    for (var section in ProjectFormStrings.formStructure) {
+    for (var section in _formStructure) {
       _initFields(section['fields'], data);
     }
   }
@@ -272,7 +293,7 @@ class _AddProjectViewState extends State<AddProjectView> {
   }
 
   void _globalToggle() {
-    final allTitles = ProjectFormStrings.formStructure.map((s) => s['title'] as String).toList();
+    final allTitles = _formStructure.map((s) => s['title'] as String).toList();
     setState(() {
       if (_expandedSections.length == allTitles.length) {
         _expandedSections.clear();
@@ -348,7 +369,7 @@ class _AddProjectViewState extends State<AddProjectView> {
 
   void _navigateToField(String fieldId) {
     String? targetSectionTitle;
-    for (var section in ProjectFormStrings.formStructure) {
+    for (var section in _formStructure) {
       if (_isFieldInSection(section['fields'], fieldId)) {
         targetSectionTitle = section['title'];
         break;
@@ -374,7 +395,7 @@ class _AddProjectViewState extends State<AddProjectView> {
   }
 
   String? _getFieldType(String fieldId) {
-    for (var section in ProjectFormStrings.formStructure) {
+    for (var section in _formStructure) {
       final res = _findType(section['fields'], fieldId);
       if (res != null) return res;
     }
@@ -394,7 +415,7 @@ class _AddProjectViewState extends State<AddProjectView> {
   }
 
   List<String> _getChipOptions(String fieldId) {
-    for (var section in ProjectFormStrings.formStructure) {
+    for (var section in _formStructure) {
       final res = _findOptions(section['fields'], fieldId);
       if (res != null) return res;
     }
@@ -501,7 +522,7 @@ class _AddProjectViewState extends State<AddProjectView> {
     }
 
     Map<String, dynamic>? config;
-    for (var section in ProjectFormStrings.formStructure) {
+    for (var section in _formStructure) {
       config = _findFieldConfig(section['fields'], fieldId);
       if (config != null) break;
     }
@@ -610,7 +631,7 @@ class _AddProjectViewState extends State<AddProjectView> {
 
     if (id == 'isHot') {
       final Set<String> takenPriorities = {};
-      final String currentProjectId = widget.project?.id ?? '';
+      final String currentProjectId = _resolvedProject?.id ?? widget.projectId ?? '';
 
       for (var p in projectVM.projects) {
         if (p.id == currentProjectId) continue;
@@ -657,10 +678,10 @@ class _AddProjectViewState extends State<AddProjectView> {
   }
 
   void _navigateBackOnCancelOrSave({String? targetDocId}) {
-    if (widget.project != null || targetDocId != null) {
-      final docId = targetDocId ?? widget.project!.id;
+    if (_resolvedProject != null || widget.projectId != null || targetDocId != null) {
+      final docId = targetDocId ?? _resolvedProject?.id ?? widget.projectId!;
       final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
-      final updatedProject = projectVM.projects.where((p) => p.id == docId).firstOrNull ?? widget.project;
+      final updatedProject = projectVM.projects.where((p) => p.id == docId).firstOrNull ?? _resolvedProject;
       
       context.go('/project-detail/$docId', extra: updatedProject);
     } else {
@@ -670,7 +691,7 @@ class _AddProjectViewState extends State<AddProjectView> {
 
   @override
   Widget build(BuildContext context) {
-    final isEditing = widget.project != null;
+    final isEditing = _resolvedProject != null || widget.projectId != null;
 
     return PopScope(
       canPop: false,
@@ -692,7 +713,7 @@ class _AddProjectViewState extends State<AddProjectView> {
               child: ListView(
                 controller: _scrollController,
                 padding: const EdgeInsets.only(bottom: 20),
-                children: ProjectFormStrings.formStructure.map<Widget>((section) => _buildSection(section)).toList(),
+                children: _formStructure.map<Widget>((section) => _buildSection(section)).toList(),
               ),
             ),
             _buildStickyNavigation(isEditing),
@@ -2840,7 +2861,7 @@ class _AddProjectViewState extends State<AddProjectView> {
 
       // Save Project Document to Firestore first (instant!)
       await projectVM.addOrUpdateProject(
-        id: widget.project?.id,
+        id: _resolvedProject?.id ?? widget.projectId,
         projectName: projName,
         propertyType: _formData['propertyType'] ?? 'Project',
         legality: _formData['isReraApproved'] == 'Yes' ? 'RERA Approved' : 'N/A',
@@ -2867,7 +2888,7 @@ class _AddProjectViewState extends State<AddProjectView> {
             duration: const Duration(seconds: 3),
           ),
         );
-        _navigateBackOnCancelOrSave(targetDocId: widget.project?.id ?? _toTitleCase(projName));
+        _navigateBackOnCancelOrSave(targetDocId: _resolvedProject?.id ?? widget.projectId ?? _toTitleCase(projName));
       }
 
       // Background Async Upload

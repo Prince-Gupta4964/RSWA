@@ -34,8 +34,12 @@ import '../views/projects/recycle_bin_view.dart';
 import '../views/builders/builder_list_view.dart';
 import '../views/builders/add_builder_view.dart';
 import '../views/builders/builder_detail_view.dart';
+import '../features/bulk_whatsapp/screens/campaign_dashboard_screen.dart'; // 🚀 NAYA
+import '../features/bulk_whatsapp/screens/create_campaign_screen.dart'; // 🚀 NAYA
+import '../features/bulk_whatsapp/screens/template_builder_screen.dart'; // 🚀 NAYA
 import '../views/profile/my_profile_view.dart';
 import '../views/admin/dropdown_manager_view.dart';
+import '../views/admin/form_labels_manager_view.dart';
 import '../models/builder_model.dart';
 import '../widgets/auth_guard.dart';
 import '../widgets/app_bottom_nav.dart';
@@ -148,6 +152,21 @@ class AppRouter {
 
       // --- SUB SCREENS (Outside of Shell to hide Bottom Nav) ---
       GoRoute(
+        path: '/whatsapp-campaigns',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AuthGuard(child: CampaignDashboardScreen()),
+      ),
+      GoRoute(
+        path: '/create-campaign',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AuthGuard(child: CreateCampaignScreen()),
+      ),
+      GoRoute(
+        path: '/template-builder',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AuthGuard(child: TemplateBuilderScreen()),
+      ),
+      GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: '/task',
         builder: (context, state) {
@@ -188,7 +207,7 @@ class AppRouter {
                lead = leadVM.leads.firstWhere((l) => l.id == leadId);
              } catch (_) {}
           }
-          return AuthGuard(child: AddLeadView(lead: lead));
+          return AuthGuard(child: AddLeadView(lead: lead, leadId: leadId != 'new' ? leadId : null));
         },
       ),
       GoRoute(
@@ -292,6 +311,21 @@ class AppRouter {
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
+        path: '/add-project/:projectId',
+        builder: (context, state) {
+          final projectId = state.pathParameters['projectId'];
+          ProjectModel? project = state.extra as ProjectModel?;
+          if (project == null && projectId != null && projectId != 'new') {
+             try {
+               final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+               project = projectVM.projects.firstWhere((p) => p.id == projectId);
+             } catch (_) {}
+          }
+          return AuthGuard(child: AddProjectView(project: project, projectId: projectId != 'new' ? projectId : null));
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/project-detail/:projectId',
         builder: (context, state) {
           final projectId = state.pathParameters['projectId'];
@@ -349,6 +383,11 @@ class AppRouter {
         parentNavigatorKey: _rootNavigatorKey,
         path: '/dropdown-manager',
         builder: (context, state) => const AuthGuard(child: DropdownManagerView()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/form-labels-manager',
+        builder: (context, state) => const AuthGuard(child: FormLabelsManagerView()),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

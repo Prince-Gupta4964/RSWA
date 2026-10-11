@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:813321513896:android:bf4fa015da8759d5b84b9d",
         "android_client_info": {
-          "package_name": "com.example.rswa"
+          "package_name": "com.atech.propertyplus"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "813321513896-o033tkh4tkugsrrjn5ilpbfovprk2s45.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.rswa",
+            "package_name": "com.atech.propertyplus",
             "certificate_hash": "24d1b493441edb1a85855371ec9a38cef2a1e8e0"
           }
         },

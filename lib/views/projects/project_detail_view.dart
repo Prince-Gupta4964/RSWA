@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:ui_web' as ui_web;
-import 'package:web/web.dart' as web;
+import '../../utils/youtube_view_registrar.dart';
 import 'package:flutter/gestures.dart'; // 🚀 NAYA: For mouse/trackpad drag on web
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
@@ -184,7 +183,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
         floatingActionButton: (!widget.isPublicView && _canEditProject(authVM, project))
             ? FloatingActionButton(
                 backgroundColor: const Color(0xFFFF6B22),
-                onPressed: () => context.push('/add-project', extra: project),
+                onPressed: () => context.push('/add-project/${project.id}', extra: project),
                 child: const Icon(Icons.edit, color: Colors.white),
               )
             : null,
@@ -1433,22 +1432,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
     }
 
     if (kIsWeb) {
-      try {
-        final origin = Uri.base.origin;
-        // ignore: undefined_prefixed_name
-        ui_web.platformViewRegistry.registerViewFactory(
-          'youtube-iframe-$videoId',
-          (int viewId) {
-            final web.HTMLIFrameElement iframe = web.document.createElement('iframe') as web.HTMLIFrameElement;
-            iframe.src = 'https://www.youtube.com/embed/$videoId?autoplay=1&origin=$origin';
-            iframe.style.border = 'none';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-            return iframe;
-          },
-        );
-      } catch (_) {}
+      registerYouTubeViewFactory('youtube-iframe-$videoId', videoId);
     }
 
     showDialog(

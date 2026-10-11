@@ -13,6 +13,8 @@ import 'viewmodels/app_configuration_viewmodel.dart';
 import 'viewmodels/user_management_viewmodel.dart';
 import 'viewmodels/builder_viewmodel.dart';
 import 'viewmodels/recycle_bin_viewmodel.dart'; // 🚀 NAYA
+import 'features/bulk_whatsapp/viewmodels/campaign_viewmodel.dart'; // 🚀 NAYA
+import 'features/bulk_whatsapp/viewmodels/whatsapp_template_viewmodel.dart'; // 🚀 NAYA
 import 'package:firebase_messaging/firebase_messaging.dart'; // 🚀 NAYA
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // 🚀 NAYA
 
@@ -161,6 +163,8 @@ class RSWAApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserManagementViewModel()),
         ChangeNotifierProvider(create: (_) => BuilderViewModel()),
         ChangeNotifierProvider(create: (_) => RecycleBinViewModel()), // 🚀 NAYA
+        ChangeNotifierProvider(create: (_) => CampaignViewModel()), // 🚀 NAYA
+        ChangeNotifierProvider(create: (_) => WhatsAppTemplateViewModel()), // 🚀 NAYA
       ],
       child: MaterialApp.router(
         title: 'Property Plus',

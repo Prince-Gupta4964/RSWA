@@ -91,6 +91,7 @@ class AppConfigurationViewModel extends ChangeNotifier {
     _listenToCustomForms();
     _listenToStatuses();
     _listenToFieldOptions();
+    _listenToFormLabels();
   }
 
   List<DashboardTabConfig> tabsForRole(AppRole role) {
@@ -257,6 +258,108 @@ class AppConfigurationViewModel extends ChangeNotifier {
       if (custom.isNotEmpty) return custom;
     }
     return defaultOptions;
+  }
+
+  Map<String, List<Map<String, dynamic>>> _formLabelsConfig = {};
+  Map<String, List<Map<String, dynamic>>> get formLabelsConfig => _formLabelsConfig;
+
+  void _listenToFormLabels() {
+    _db.collection('app_config').doc('form_labels').snapshots().listen((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        final data = snapshot.data()!['forms'];
+        if (data is Map) {
+          final Map<String, List<Map<String, dynamic>>> parsed = {};
+          data.forEach((formName, fieldsList) {
+            if (fieldsList is List) {
+              parsed[formName.toString()] = fieldsList
+                  .whereType<Map>()
+                  .map((f) => f.map((k, v) => MapEntry(k.toString(), v)))
+                  .toList();
+            }
+          });
+          _formLabelsConfig = parsed;
+          notifyListeners();
+        }
+      }
+    });
+  }
+
+  List<Map<String, dynamic>> getFormStructure(String formName, List<Map<String, dynamic>> defaultStructure) {
+    if (!_formLabelsConfig.containsKey(formName)) return defaultStructure;
+    final savedFields = _formLabelsConfig[formName]!;
+    
+    final Map<String, Map<String, dynamic>> overrideMap = {};
+    for (var sf in savedFields) {
+      final id = sf['id']?.toString();
+      if (id != null) overrideMap[id] = sf;
+    }
+
+    List<Map<String, dynamic>> cloned = [];
+    for (var section in defaultStructure) {
+      final Map<String, dynamic> newSec = Map.from(section);
+      final fieldsList = section['fields'] as List<dynamic>? ?? [];
+      List<dynamic> newFields = [];
+
+      for (var field in fieldsList) {
+        if (field['type'] == 'row') {
+          final Map<String, dynamic> newRow = Map.from(field);
+          final subFields = field['fields'] as List<dynamic>? ?? [];
+          List<dynamic> newSubs = [];
+          for (var sub in subFields) {
+            final Map<String, dynamic> newSub = Map.from(sub);
+            final id = newSub['id']?.toString();
+            if (id != null && overrideMap.containsKey(id)) {
+              final override = overrideMap[id]!;
+              if (override['label'] != null) newSub['label'] = override['label'];
+              if (override['isVisible'] != null) newSub['isVisible'] = override['isVisible'];
+              if (override['initialValue'] != null && override['initialValue'].toString().isNotEmpty) {
+                newSub['initialValue'] = override['initialValue'];
+              }
+              if (override['type'] != null) newSub['type'] = override['type'];
+              if (override['options'] != null) {
+                if (override['options'] is String) {
+                  newSub['options'] = (override['options'] as String).split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+                } else if (override['options'] is List) {
+                  newSub['options'] = override['options'];
+                }
+              }
+            }
+            if (newSub['isVisible'] != false) {
+              newSubs.add(newSub);
+            }
+          }
+          newRow['fields'] = newSubs;
+          if (newSubs.isNotEmpty) {
+            newFields.add(newRow);
+          }
+        } else {
+          final Map<String, dynamic> newField = Map.from(field);
+          final id = newField['id']?.toString();
+          if (id != null && overrideMap.containsKey(id)) {
+            final override = overrideMap[id]!;
+            if (override['label'] != null) newField['label'] = override['label'];
+            if (override['isVisible'] != null) newField['isVisible'] = override['isVisible'];
+            if (override['initialValue'] != null && override['initialValue'].toString().isNotEmpty) {
+              newField['initialValue'] = override['initialValue'];
+            }
+            if (override['type'] != null) newField['type'] = override['type'];
+            if (override['options'] != null) {
+              if (override['options'] is String) {
+                newField['options'] = (override['options'] as String).split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+              } else if (override['options'] is List) {
+                newField['options'] = override['options'];
+              }
+            }
+          }
+          if (newField['isVisible'] != false) {
+            newFields.add(newField);
+          }
+        }
+      }
+      newSec['fields'] = newFields;
+      cloned.add(newSec);
+    }
+    return cloned;
   }
 
   Future<void> saveFieldOptions(Map<String, Map<String, List<String>>> options) async {

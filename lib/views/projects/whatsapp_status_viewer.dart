@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:ui_web' as ui_web;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:web/web.dart' as web;
+import '../../utils/youtube_view_registrar.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../models/project_model.dart';
 
@@ -201,22 +200,7 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
 
     // 🚀 Register YouTube view factory for Web
     if (kIsWeb && _videoId != null) {
-      try {
-        final origin = Uri.base.origin;
-        // ignore: undefined_prefixed_name
-        ui_web.platformViewRegistry.registerViewFactory(
-          'youtube-iframe-status-$_videoId',
-          (int viewId) {
-            final web.HTMLIFrameElement iframe = web.document.createElement('iframe') as web.HTMLIFrameElement;
-            iframe.src = 'https://www.youtube.com/embed/$_videoId?autoplay=1&origin=$origin';
-            iframe.style.border = 'none';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-            return iframe;
-          },
-        );
-      } catch (_) {}
+      registerYouTubeViewFactory('youtube-iframe-status-$_videoId', _videoId!);
     }
 
     // 🚀 Precache all images immediately for instant lazy loading / zero lag

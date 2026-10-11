@@ -68,7 +68,7 @@ class CPModel {
       referralCode: data['referralCode'] ?? '',
       isApproved: data['isApproved'] == true || data['isApproved'] == 1,
       isProfileComplete: data['isProfileComplete'] == true || data['isProfileComplete'] == 1,
-      isDeleted: data['isDeleted'] == true, // 🚀 NAYA
+      isDeleted: data['isDeleted'] == true,
       rawData: data,
     );
   }

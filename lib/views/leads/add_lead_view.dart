@@ -20,8 +20,9 @@ import '../../utils/role_permissions.dart';
 
 class AddLeadView extends StatefulWidget {
   final LeadModel? lead;
+  final String? leadId;
 
-  const AddLeadView({super.key, this.lead});
+  const AddLeadView({super.key, this.lead, this.leadId});
 
   @override
   State<AddLeadView> createState() => _AddLeadViewState();
@@ -30,6 +31,12 @@ class AddLeadView extends StatefulWidget {
 class _AddLeadViewState extends State<AddLeadView> {
   bool _isSaving = false;
   final Set<String> _expandedSections = {LeadFormStrings.sectionBasicInfo};
+  LeadModel? _resolvedLead;
+
+  List<Map<String, dynamic>> get _formStructure {
+    final configVM = Provider.of<AppConfigurationViewModel>(context);
+    return configVM.getFormStructure('Lead Form', LeadFormStrings.formStructure);
+  }
 
   final Map<String, dynamic> _formData = {};
   final Map<String, TextEditingController> _controllers = {};
@@ -48,26 +55,39 @@ class _AddLeadViewState extends State<AddLeadView> {
   static const Color primaryColor = Color(0xFFFBE64E);
   static const Color secondaryColor = Color(0xFF6B5800);
 
+  bool _isInit = false;
+
   @override
-  void initState() {
-    super.initState();
-    final authVM = Provider.of<AuthViewModel>(context, listen: false);
-    if (authVM.appRole == AppRole.cp && !authVM.isApproved) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Your account is pending admin approval.'), backgroundColor: Colors.red),
-          );
-          context.go('/dashboard');
-        }
-      });
-      return;
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInit) {
+      _isInit = true;
+      final authVM = Provider.of<AuthViewModel>(context, listen: false);
+      if (authVM.appRole == AppRole.cp && !authVM.isApproved) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Your account is pending admin approval.'), backgroundColor: Colors.red),
+            );
+            context.go('/dashboard');
+          }
+        });
+        return;
+      }
+      _initializeData();
     }
-    _initializeData();
   }
 
   void _initializeData() {
-    final existingData = widget.lead?.rawData ?? {};
+    _resolvedLead = widget.lead;
+    if (_resolvedLead == null && widget.leadId != null) {
+      try {
+        final leadVM = Provider.of<LeadViewModel>(context, listen: false);
+        _resolvedLead = leadVM.leads.firstWhere((l) => l.id == widget.leadId);
+      } catch (_) {}
+    }
+
+    final existingData = _resolvedLead?.rawData ?? {};
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
 
     _formData['leadType'] = existingData['leadType'] ?? 'Client';
@@ -79,18 +99,18 @@ class _AddLeadViewState extends State<AddLeadView> {
     _formData['coupon'] = existingData['coupon'] ?? 'No';
     _formData['sendProjectDetails'] = existingData['sendProjectDetails'] ?? 'No';
 
-    if (widget.lead == null && authVM.appRole == AppRole.cp) {
+    if (_resolvedLead == null && authVM.appRole == AppRole.cp) {
       _formData['referralName1'] = authVM.userName;
       _formData['source'] = 'Referral';
     }
 
-    for (var section in LeadFormStrings.formStructure) {
+    for (var section in _formStructure) {
       for (var field in section['fields']) {
         _initializeField(field, existingData);
       }
     }
 
-    if (widget.lead == null) {
+    if (_resolvedLead == null) {
       final now = DateTime.now();
       final formatter = DateFormat('dd MMM yyyy, hh:mm a');
       _controllers['timestamp']?.text = formatter.format(now);
@@ -102,7 +122,7 @@ class _AddLeadViewState extends State<AddLeadView> {
       }
     }
 
-    if (_flatFields.isNotEmpty && widget.lead == null) {
+    if (_flatFields.isNotEmpty && _resolvedLead == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _focusNodes['company']?.requestFocus();
       });
@@ -186,7 +206,7 @@ class _AddLeadViewState extends State<AddLeadView> {
   }
 
   void _globalToggle() {
-    final allTitles = LeadFormStrings.formStructure.map((s) => s['title'] as String).toList();
+    final allTitles = _formStructure.map((s) => s['title'] as String).toList();
     setState(() {
       if (_expandedSections.length == allTitles.length) {
         _expandedSections.clear();
@@ -199,7 +219,7 @@ class _AddLeadViewState extends State<AddLeadView> {
 
   List<String> _getFieldOptions(String fieldId) {
     List<String> staticOptions = [];
-    for (var section in LeadFormStrings.formStructure) {
+    for (var section in _formStructure) {
       for (var field in section['fields']) {
         if (field['type'] == 'row') {
           for (var sub in field['fields']) {
@@ -333,7 +353,7 @@ class _AddLeadViewState extends State<AddLeadView> {
   }
 
   String? _getFieldType(String fieldId) {
-    for (var section in LeadFormStrings.formStructure) {
+    for (var section in _formStructure) {
       for (var field in section['fields']) {
         if (field['type'] == 'row') {
           for (var sub in field['fields']) {
@@ -349,7 +369,7 @@ class _AddLeadViewState extends State<AddLeadView> {
 
   List<String> _getChipOptions(String fieldId) {
     final configVM = Provider.of<AppConfigurationViewModel>(context, listen: false);
-    for (var section in LeadFormStrings.formStructure) {
+    for (var section in _formStructure) {
       for (var field in section['fields']) {
         if (field['id'] == fieldId) {
           if (field['dynamicStatus'] == true) {
@@ -367,7 +387,7 @@ class _AddLeadViewState extends State<AddLeadView> {
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     
     Map<String, dynamic>? config;
-    for (var section in LeadFormStrings.formStructure) {
+    for (var section in _formStructure) {
       for (var field in section['fields']) {
         if (field['type'] == 'row') {
           for (var sub in field['fields']) {
@@ -403,7 +423,7 @@ class _AddLeadViewState extends State<AddLeadView> {
 
   void _navigateToField(String fieldId) {
     String? targetSectionTitle;
-    for (var section in LeadFormStrings.formStructure) {
+    for (var section in _formStructure) {
       if (_isFieldInSection(section['fields'], fieldId)) {
         targetSectionTitle = section['title'];
         break;
@@ -515,7 +535,7 @@ class _AddLeadViewState extends State<AddLeadView> {
             child: ListView(
               controller: _scrollController,
               padding: const EdgeInsets.only(bottom: 20),
-              children: LeadFormStrings.formStructure.map<Widget>((section) {
+              children: _formStructure.map<Widget>((section) {
                 return _buildSection(section);
               }).toList(),
             ),
@@ -1223,7 +1243,7 @@ class _AddLeadViewState extends State<AddLeadView> {
     final leadVM = Provider.of<LeadViewModel>(context, listen: false);
     final currentPhones = getPhoneNumbers(_formData);
     final currentEmails = getEmails(_formData);
-    final String? currentLeadId = widget.lead?.id;
+    final String? currentLeadId = _resolvedLead?.id ?? widget.leadId;
 
     for (var existingLead in leadVM.leads) {
       if (currentLeadId != null && existingLead.id == currentLeadId) continue;
@@ -1268,7 +1288,7 @@ class _AddLeadViewState extends State<AddLeadView> {
       final authVM = Provider.of<AuthViewModel>(context, listen: false);
       final String leadName = '${_formData['leadName'] ?? 'lead'}_${DateTime.now().millisecondsSinceEpoch}';
 
-      final String targetLeadId = widget.lead?.id ?? _generateUniqueID();
+      final String targetLeadId = _resolvedLead?.id ?? widget.leadId ?? _generateUniqueID();
       _formData['leadID'] = targetLeadId;
 
       final leadVM = Provider.of<LeadViewModel>(context, listen: false);
@@ -1276,7 +1296,7 @@ class _AddLeadViewState extends State<AddLeadView> {
       // Save Lead Document to Firestore first (instant!)
       await leadVM.addOrUpdateLead(
         _formData,
-        id: widget.lead?.id,
+        id: _resolvedLead?.id ?? widget.leadId,
         actorMetadata: authVM.actorMetadata,
       );
 

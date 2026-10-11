@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../../services/firebase_storage_service.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/cp_viewmodel.dart';
+import '../../viewmodels/app_configuration_viewmodel.dart';
 import '../../utils/cp_form_config.dart';
 import '../../utils/role_permissions.dart';
 
@@ -35,6 +36,11 @@ class _CompleteProfileViewState extends State<CompleteProfileView> {
   static const Color primaryColor = Color(0xFFFBE64E);
   static const Color secondaryColor = Color(0xFF6B5800);
 
+  List<Map<String, dynamic>> get _formStructure {
+    final configVM = Provider.of<AppConfigurationViewModel>(context);
+    return configVM.getFormStructure('CP Network Form', CPFormStrings.formStructure);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -56,7 +62,7 @@ class _CompleteProfileViewState extends State<CompleteProfileView> {
       }
     }
 
-    for (var section in CPFormStrings.formStructure) {
+    for (var section in _formStructure) {
       for (var field in section['fields']) {
         _initializeField(field, userData);
       }
@@ -135,7 +141,7 @@ class _CompleteProfileViewState extends State<CompleteProfileView> {
 
   List<String> _getFieldOptions(String fieldId) {
     List<String> staticOptions = [];
-    for (var section in CPFormStrings.formStructure) {
+    for (var section in _formStructure) {
       for (var field in section['fields']) {
         if (field['type'] == 'row') {
           for (var sub in field['fields']) {
@@ -187,7 +193,7 @@ class _CompleteProfileViewState extends State<CompleteProfileView> {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.only(bottom: 100, top: 16),
-              children: CPFormStrings.formStructure
+              children: _formStructure
                 .where((s) {
                   if (s['title'] == CPFormStrings.sectionLoginCredentials) return false;
                   if (s.containsKey('roles')) {

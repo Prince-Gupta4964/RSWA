@@ -43,6 +43,15 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
 
   // --- Expanded Search Popup State ---
   String _searchCategory = 'All';
+  String? _selectedMainCategory;
+  String? _selectedSubCategory;
+  final Map<String, List<String>> _subTypesMap = {
+    'Project': ['Residential', 'Shop', 'Bungalow', 'Redevelopment', 'Bulk'],
+    'Apartment': ['1BHK', '2BHK', '3BHK', '4BHK', '5BHK'],
+    'Shop': ['1 STOREY', '2 STOREY'],
+    'Bungalow': ['1BHK', '2BHK', '3BHK', '4BHK', '5BHK'],
+    'Land': ['NA', 'Non-NA'],
+  };
   final List<Map<String, dynamic>> _categories = [
     {'label': 'All', 'icon': Icons.grid_view_rounded, 'value': 'All'},
     {'label': 'Projects', 'icon': Icons.location_city_rounded, 'value': 'Project'},
@@ -643,22 +652,38 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     );
   }
 
-  bool _matchesSearchCategory(String type) {
+  bool _matchesSearchCategory(ProjectModel project) {
     if (_searchCategory == 'All' || _searchCategory.isEmpty) return true;
-    final t = type.toLowerCase();
+    final t = project.propertyType.toLowerCase();
     final cat = _searchCategory.toLowerCase();
+    bool matchesMain = false;
     if (cat == 'project') {
-      return t == 'project' || t == 'residential';
+      matchesMain = t == 'project' || t == 'residential';
     } else if (cat == 'apartment' || cat == 'flat') {
-      return t == 'flat' || t == 'apartment' || t == 'residential' || t == 'flats';
+      matchesMain = t == 'flat' || t == 'apartment' || t == 'residential' || t == 'flats';
     } else if (cat == 'shop') {
-      return t == 'shop' || t == 'commercial' || t == 'office' || t == 'showroom' || t == 'shops';
+      matchesMain = t == 'shop' || t == 'commercial' || t == 'office' || t == 'showroom' || t == 'shops';
     } else if (cat == 'bungalow') {
-      return t == 'bungalow' || t == 'villa';
+      matchesMain = t == 'bungalow' || t == 'villa';
     } else if (cat == 'land' || cat == 'plot') {
-      return t == 'land' || t == 'plot';
+      matchesMain = t == 'land' || t == 'plot';
+    } else {
+      matchesMain = t.contains(cat);
     }
-    return t.contains(cat);
+
+    if (!matchesMain) return false;
+
+    if (_selectedSubCategory != null && _selectedSubCategory!.isNotEmpty) {
+      final sub = _selectedSubCategory!.toLowerCase();
+      final detailsStr = project.propertyDetails.values.map((e) => e.toString()).join(' ').toLowerCase();
+      final configStr = (project.propertyDetails['configuration'] ?? '').toString().toLowerCase();
+      final subTypeStr = (project.propertyDetails['subType'] ?? '').toString().toLowerCase();
+      if (!detailsStr.contains(sub) && !configStr.contains(sub) && !subTypeStr.contains(sub)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   @override
@@ -1003,7 +1028,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                           final bool isBypassTab = currentTabName == 'My Projects' || currentTabName == 'Pending' || currentTabName == 'Fav Projects';
                           
                           if (!isBypassTab) {
-                            if (!_matchesSearchCategory(project.propertyType)) return false;
+                            if (!_matchesSearchCategory(project)) return false;
                             if (_selectedTypeFilter != null && project.propertyType != _selectedTypeFilter) return false;
                             if (_selectedSubTypeFilter != null) {
                               final sub = (project.propertyDetails['subType'] ?? project.propertyDetails['condition'] ?? project.rawData['subType'] ?? '').toString().toLowerCase();
@@ -1170,65 +1195,86 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     }
   }
 
+  IconData _getSubtypeIcon(String sub) {
+    final s = sub.toLowerCase();
+    if (s.contains('residential') || s.contains('house')) return Icons.home_outlined;
+    if (s.contains('shop')) return Icons.storefront_outlined;
+    if (s.contains('bungalow') || s.contains('villa')) return Icons.gite_outlined;
+    if (s.contains('redevelopment')) return Icons.apartment_rounded;
+    if (s.contains('bulk')) return Icons.domain_rounded;
+    if (s.contains('bhk')) return Icons.bed_outlined;
+    if (s.contains('storey')) return Icons.layers_outlined;
+    if (s.contains('na') || s.contains('land') || s.contains('plot')) return Icons.landscape_outlined;
+    return Icons.label_outline_rounded;
+  }
+
   Widget _buildCategoryCarousel() {
-    return Center(
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+    if (_selectedMainCategory != null && _selectedMainCategory != 'All') {
+      final mainCat = _selectedMainCategory!;
+      final subTypes = _subTypesMap[mainCat] ?? [];
+
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedMainCategory = null;
+                  _selectedSubCategory = null;
+                  _searchCategory = 'All';
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _primaryDark,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Text(mainCat, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.close, color: Colors.white, size: 16),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: _categories.map((cat) {
-              final isSelected = _searchCategory == cat['value'] || (_searchCategory == 'All' && cat['value'] == 'All');
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0),
+              child: Text('|', style: TextStyle(color: Colors.grey, fontSize: 18, fontWeight: FontWeight.w300)),
+            ),
+            ...subTypes.map((sub) {
+              final isSelected = _selectedSubCategory == sub;
               return GestureDetector(
                 onTap: () {
                   setState(() {
-                    _searchCategory = cat['value'];
+                    _selectedSubCategory = isSelected ? null : sub;
                   });
                 },
                 child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Column(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? _primaryLight.withValues(alpha: 0.4) : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: isSelected ? _primaryDark : Colors.grey.shade300, width: 1.2),
+                  ),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        height: 36,
-                        width: 36,
-                        decoration: BoxDecoration(
-                          color: isSelected ? _primaryDark : Colors.grey.shade100,
-                          shape: BoxShape.circle,
-                          boxShadow: isSelected
-                              ? [BoxShadow(color: _primaryDark.withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))]
-                              : null,
-                          border: Border.all(
-                            color: isSelected ? _primaryDark : Colors.grey.shade300,
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Icon(
-                          cat['icon'],
-                          color: isSelected ? Colors.white : Colors.black87,
-                          size: 18,
-                        ),
+                      Icon(
+                        _getSubtypeIcon(sub),
+                        size: 14,
+                        color: isSelected ? _primaryDark : Colors.black87,
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(width: 5),
                       Text(
-                        cat['label'],
+                        sub,
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: 12,
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                           color: isSelected ? _primaryDark : Colors.black87,
                         ),
@@ -1237,9 +1283,74 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                   ),
                 ),
               );
-            }).toList(),
-          ),
+            }),
+          ],
         ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: _categories.map((cat) {
+          final val = cat['value'];
+          final isSelected = _searchCategory == val || (_searchCategory == 'All' && val == 'All');
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                if (val == 'All') {
+                  _selectedMainCategory = null;
+                  _selectedSubCategory = null;
+                  _searchCategory = 'All';
+                } else {
+                  _selectedMainCategory = val;
+                  _selectedSubCategory = null;
+                  _searchCategory = val;
+                }
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    height: 36,
+                    width: 36,
+                    decoration: BoxDecoration(
+                      color: isSelected ? _primaryDark : Colors.grey.shade100,
+                      shape: BoxShape.circle,
+                      boxShadow: isSelected
+                          ? [BoxShadow(color: _primaryDark.withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))]
+                          : null,
+                      border: Border.all(
+                        color: isSelected ? _primaryDark : Colors.grey.shade300,
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Icon(
+                      cat['icon'],
+                      color: isSelected ? Colors.white : Colors.black87,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    cat['label'],
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      color: isSelected ? _primaryDark : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
