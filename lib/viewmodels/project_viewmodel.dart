@@ -120,6 +120,26 @@ class ProjectViewModel extends ChangeNotifier {
     }
   }
 
+  Map<String, dynamic> _sanitizeMap(Map<String, dynamic> input) {
+    final Map<String, dynamic> output = {};
+    input.forEach((key, value) {
+      if (value is DateTime) {
+        output[key] = Timestamp.fromDate(value);
+      } else if (value is Map) {
+        output[key] = _sanitizeMap(Map<String, dynamic>.from(value));
+      } else if (value is List) {
+        output[key] = value.where((item) => item != null && (item is String || item is num || item is bool || item is Timestamp || item is Map || item is DateTime)).map((item) {
+          if (item is DateTime) return Timestamp.fromDate(item);
+          if (item is Map) return _sanitizeMap(Map<String, dynamic>.from(item));
+          return item;
+        }).toList();
+      } else if (value is String || value is num || value is bool || value is Timestamp || value is FieldValue) {
+        output[key] = value;
+      }
+    });
+    return output;
+  }
+
   Future<void> addOrUpdateProject({
     String? id,
     required String projectName,
@@ -135,6 +155,8 @@ class ProjectViewModel extends ChangeNotifier {
     String? actorName,
     String? actorRole,
   }) async {
+    propertyDetails = _sanitizeMap(propertyDetails);
+    
     final String isApproved = propertyDetails['isApproved']?.toString() ?? 'No';
     propertyDetails['isApproved'] = isApproved;
 
