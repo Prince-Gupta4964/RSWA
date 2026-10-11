@@ -165,8 +165,10 @@ class _CampaignDashboardScreenState extends State<CampaignDashboardScreen> {
                                         ],
                                       ),
                                     ),
-                              ],
-                            ),
+                                  ],
+                                ),
+                              );
+                            },
                           );
                         },
                       ),
