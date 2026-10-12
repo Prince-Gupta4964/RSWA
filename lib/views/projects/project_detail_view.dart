@@ -56,6 +56,24 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    try {
+      final details = widget.project.propertyDetails;
+      final List<String> imageUrls = (details['images'] is Iterable) ? List<String>.from(details['images']) : [];
+      final String? coverImg = (widget.project.coverImage ?? details['coverImage'])?.toString().trim();
+      if (coverImg != null && coverImg.startsWith('http')) {
+        precacheImage(NetworkImage(coverImg), context);
+      }
+      for (var img in imageUrls) {
+        if (img.startsWith('http')) {
+          precacheImage(NetworkImage(img), context);
+        }
+      }
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
     _wingCtrl.dispose();

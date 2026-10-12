@@ -107,6 +107,20 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    try {
+      final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+      for (var p in projectVM.projects) {
+        final displayImage = (p.coverImage ?? p.propertyDetails['coverImage'])?.toString().trim();
+        if (displayImage != null && displayImage.startsWith('http')) {
+          precacheImage(NetworkImage(displayImage), context);
+        }
+      }
+    } catch (_) {}
+  }
+
   bool get _hasActiveFilters =>
       _searchCategory != 'All' ||
       _searchQuery.isNotEmpty ||
