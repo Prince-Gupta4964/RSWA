@@ -86,10 +86,6 @@ class _LeadListViewState extends State<LeadListView> {
 
     List<LeadModel> visibleLeads = leadVM.applyFiltersAndSort(widget.leads ?? leadVM.leads, widget.tabId);
 
-    if (leadVM.isLoading && widget.leads == null) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B22)));
-    }
-
     if (visibleLeads.isEmpty) {
       return Center(
         child: Padding(

@@ -43,9 +43,7 @@ class BuilderListView extends StatelessWidget {
           ),
         ),
       drawer: const AppDrawer(),
-      body: builderVM.isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B22)))
-          : ListView.separated(
+      body: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: builderVM.builders.length,
               separatorBuilder: (context, index) => const Divider(),

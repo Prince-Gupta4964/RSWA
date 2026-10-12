@@ -19,7 +19,10 @@ class StorageHelper {
   /// Retrieves the saved user ID. Works across refresh on Web.
   static Future<String?> getSession() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance().timeout(
+        const Duration(seconds: 1),
+        onTimeout: () => throw Exception('SharedPreferences timeout'),
+      );
       final id = prefs.getString(_sessionKey);
       debugPrint('STORAGE: Retrieved session ID: $id');
       return id;

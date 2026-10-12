@@ -963,9 +963,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
               ),
             ),
             Expanded(
-              child: projectVM.isLoading
-                  ? Center(child: CircularProgressIndicator(color: _primaryDark))
-                  : TabBarView(
+              child: TabBarView(
                       controller: _tabController,
                       children: tabs.map((currentTabName) {
                         final displayProjects = projectVM.projects.where((project) {

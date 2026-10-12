@@ -2906,6 +2906,11 @@ class _AddProjectViewState extends State<AddProjectView> {
     }
   }
 
+  static String _sanitizeDocIdStatic(String name) {
+    if (name.trim().isEmpty) return 'unnamed-project';
+    return name.trim().toLowerCase().replaceAll('/', '-').replaceAll('\\', '-').replaceAll(RegExp(r'\s+'), '-');
+  }
+
   static Future<void> _uploadProjectMediaInBackground(
     String projectName,
     Map<String, List<dynamic>> pickedMediaLists,
@@ -2914,7 +2919,7 @@ class _AddProjectViewState extends State<AddProjectView> {
     String folderName,
   ) async {
     final db = FirebaseFirestore.instance;
-    final sanitizeId = projectName.trim().replaceAll('/', '-').replaceAll('\\', '-').replaceAll(RegExp(r'\s+'), ' ');
+    final sanitizeId = _sanitizeDocIdStatic(projectName);
 
     try {
       for (var entry in pickedMediaLists.entries) {

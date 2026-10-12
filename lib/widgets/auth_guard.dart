@@ -13,16 +13,12 @@ class AuthGuard extends StatelessWidget {
   Widget build(BuildContext context) {
     final authVM = Provider.of<AuthViewModel>(context);
 
-    if (authVM.isCheckingSession) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFFFF6B22)),
-        ),
-      );
+    // Never block UI on session check - render immediately
+    if (authVM.isCheckingSession && !authVM.isAuthenticated) {
+      return child;
     }
 
-    if (!authVM.isAuthenticated) {
+    if (!authVM.isAuthenticated && !authVM.isCheckingSession) {
       return const LoginView();
     }
 

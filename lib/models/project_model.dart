@@ -80,6 +80,10 @@ class ProjectModel {
     final double avg = double.tryParse(data['avgRating']?.toString() ?? '') ?? double.tryParse(pd['avgRating']?.toString() ?? '') ?? 0.0;
     final int count = int.tryParse(data['ratingCount']?.toString() ?? '') ?? int.tryParse(pd['ratingCount']?.toString() ?? '') ?? 0;
 
+    final cover = data['coverImage'] ?? pd['coverImage'] ?? 
+        (pd['images'] is List && (pd['images'] as List).isNotEmpty ? pd['images'][0] : null) ?? 
+        (data['images'] is List && (data['images'] as List).isNotEmpty ? data['images'][0] : null);
+
     return ProjectModel(
       id: documentId,
       projectName: data['projectName'] ?? 'Unknown Project',
@@ -95,7 +99,7 @@ class ProjectModel {
       isDeleted: data['isDeleted'] == true,
       createdByUid: data['createdByUid']?.toString() ?? cbUid,
       rawData: data,
-      coverImage: (data['coverImage'] ?? pd['coverImage'])?.toString(),
+      coverImage: cover?.toString(),
       avgRating: avg,
       ratingCount: count,
     );

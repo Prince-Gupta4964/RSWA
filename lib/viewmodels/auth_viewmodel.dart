@@ -22,7 +22,7 @@ class AuthViewModel extends ChangeNotifier {
   String? _userRole;
   AppRole _permissionRole = AppRole.unknown;
   Map<String, dynamic>? _userData;
-  bool _isCheckingSession = true;
+  bool _isCheckingSession = false;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSubscription;
   String? _subscribedUserId;
   String? _currentReferralCode; // 🚀 NAYA: Global tracking for Web Google login
@@ -260,22 +260,36 @@ class AuthViewModel extends ChangeNotifier {
   Future<void> _restoreSession() async {
     _isCheckingSession = true;
     notifyListeners(); 
+
+    bool completed = false;
+    Timer(const Duration(milliseconds: 2000), () {
+      if (!completed && _isCheckingSession) {
+        debugPrint('AUTH: Session check forced complete by timer fallback.');
+        completed = true;
+        _isCheckingSession = false;
+        notifyListeners();
+      }
+    });
     
     try {
       debugPrint('AUTH: Starting session restoration...');
-      final savedUserId = await StorageHelper.getSession();
+      final savedUserId = await StorageHelper.getSession().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => null,
+      );
 
       if (savedUserId != null && savedUserId.trim().isNotEmpty) {
         debugPrint('AUTH: Found saved UID in storage: $savedUserId');
         final success = await _loadUserById(
           savedUserId.trim(),
           updateLoginAudit: false,
+        ).timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => false,
         );
         
         if (!success) {
           debugPrint('AUTH: Failed to load user from Firestore. Session might be invalid.');
-          // Don't clear immediately on network error, but if doc is missing, clear.
-          // await StorageHelper.clearSession(); 
         } else {
           debugPrint('AUTH: Session restored successfully for $userName');
         }
@@ -285,9 +299,13 @@ class AuthViewModel extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('AUTH ERROR (Restore Session): $e');
+      _clearSessionData();
     } finally {
-      _isCheckingSession = false;
-      notifyListeners();
+      if (!completed) {
+        completed = true;
+        _isCheckingSession = false;
+        notifyListeners();
+      }
     }
   }
 

@@ -609,11 +609,7 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
           ],
         ),
         drawer: const AppDrawer(),
-        body: cpVM.isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFFF6B22)),
-              )
-            : Column(
+        body: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 🚀 NAYA: Clean text tabs with underline (No Containers)
