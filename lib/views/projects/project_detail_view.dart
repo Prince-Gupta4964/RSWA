@@ -1525,6 +1525,8 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
                   ? Image.network(
                       bgImageUrl,
                       fit: BoxFit.cover,
+                      cacheWidth: 300,
+                      cacheHeight: 300,
                       errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1E293B)),
                     )
                   : Container(color: tileBgColor ?? const Color(0xFF0F1B3B)),
@@ -2020,6 +2022,8 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
                             child: Image.network(
                               imageUrls[idx],
                               fit: BoxFit.contain,
+                              cacheWidth: 1200,
+                              cacheHeight: 1200,
                               errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white, size: 80),
                             ),
                           ),
@@ -2298,6 +2302,8 @@ class _ProjectHeaderCarouselState extends State<_ProjectHeaderCarousel> {
                   fit: BoxFit.cover,
                   width: double.infinity,
                   height: double.infinity,
+                  cacheWidth: 800,
+                  cacheHeight: 800,
                   errorBuilder: (_, __, ___) => Container(
                     color: Colors.grey.shade200,
                     child: const Icon(Icons.broken_image, size: 80, color: Colors.grey),
