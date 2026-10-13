@@ -712,7 +712,7 @@ class _AddLeadViewState extends State<AddLeadView> {
       if (!anyVisible) return const SizedBox.shrink();
 
       return Padding(
-        padding: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.only(bottom: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: (field['fields'] as List).map<Widget>((f) {
@@ -731,7 +731,7 @@ class _AddLeadViewState extends State<AddLeadView> {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 10),
       child: _buildFieldContent(field),
     );
   }
