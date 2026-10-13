@@ -15,6 +15,7 @@ import '../../viewmodels/project_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/app_configuration_viewmodel.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../features/bulk_whatsapp/services/whatsapp_api_service.dart';
 import '../../models/lead_model.dart';
 import '../../models/cp_model.dart';
 import '../../models/project_model.dart';
@@ -1446,7 +1447,7 @@ class _AddLeadViewState extends State<AddLeadView> {
         actorMetadata: authVM.actorMetadata,
       );
 
-      // Send Project Details via WhatsApp if enabled
+      // Send Project Details via WhatsApp API if enabled
       final sendDetailsVal = _formData['sendProjectDetails'];
       final bool sendDetails = sendDetailsVal == true || sendDetailsVal == 'Yes';
       if (sendDetails) {
@@ -1469,13 +1470,10 @@ class _AddLeadViewState extends State<AddLeadView> {
                 "📍 Location: $location\n\n"
                 "🔗 View Property Details & Photos:\n$shareLink";
 
-            String cleanPhone = leadPhone.replaceAll(RegExp(r'[^0-9]'), '');
-            if (cleanPhone.length >= 10) {
-              final Uri whatsappUri = Uri.parse('https://wa.me/91${cleanPhone.substring(cleanPhone.length - 10)}?text=${Uri.encodeComponent(message)}');
-              if (await canLaunchUrl(whatsappUri)) {
-                await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
-              }
-            }
+            await WhatsAppApiService.sendMessage(
+              phoneNumber: leadPhone,
+              message: message,
+            );
           }
         }
       }

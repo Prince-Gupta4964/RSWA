@@ -356,6 +356,10 @@ class AuthViewModel extends ChangeNotifier {
       
       debugPrint('AUTH: Login successful for $userName');
       return null;
+    } on TimeoutException {
+      debugPrint('AUTH TIMEOUT ERROR');
+      _clearSessionData();
+      return 'Login timed out. Please check your internet connection.';
     } on FirebaseException catch (error) {
       debugPrint('AUTH FIREBASE ERROR [${error.code}]: ${error.message}');
       _clearSessionData();
@@ -383,7 +387,7 @@ class AuthViewModel extends ChangeNotifier {
     debugPrint('AUTH: Checking user documents by ID: $candidateIds');
     for (final documentId in candidateIds) {
       try {
-        final userDoc = await _firestore.collection('users').doc(documentId).get();
+        final userDoc = await _firestore.collection('users').doc(documentId).get().timeout(const Duration(seconds: 8));
         if (userDoc.exists) return userDoc;
       } catch (e) {
         debugPrint('AUTH: Doc lookup error for $documentId: $e');
@@ -391,19 +395,25 @@ class AuthViewModel extends ChangeNotifier {
     }
 
     debugPrint('AUTH: Falling back to field query for email: $normalizedEmail');
-    final normalizedQuery = await _firestore
-        .collection('users')
-        .where('email', isEqualTo: normalizedEmail)
-        .limit(1)
-        .get();
-    if (normalizedQuery.docs.isNotEmpty) return normalizedQuery.docs.first;
+    try {
+      final normalizedQuery = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: normalizedEmail)
+          .limit(1)
+          .get()
+          .timeout(const Duration(seconds: 8));
+      if (normalizedQuery.docs.isNotEmpty) return normalizedQuery.docs.first;
 
-    final cpQuery = await _firestore
-        .collection('cps')
-        .where('email', isEqualTo: normalizedEmail)
-        .limit(1)
-        .get();
-    if (cpQuery.docs.isNotEmpty) return cpQuery.docs.first;
+      final cpQuery = await _firestore
+          .collection('cps')
+          .where('email', isEqualTo: normalizedEmail)
+          .limit(1)
+          .get()
+          .timeout(const Duration(seconds: 8));
+      if (cpQuery.docs.isNotEmpty) return cpQuery.docs.first;
+    } catch (e) {
+      debugPrint('AUTH: Field query error: $e');
+    }
 
     return null;
   }
@@ -456,26 +466,31 @@ class AuthViewModel extends ChangeNotifier {
     String requestedUserId, {
     bool updateLoginAudit = true,
   }) async {
-    var userDoc = await _firestore.collection('customers').doc(requestedUserId).get();
-    if (!userDoc.exists) {
-      userDoc = await _firestore.collection('users').doc(requestedUserId).get();
+    try {
+      var userDoc = await _firestore.collection('customers').doc(requestedUserId).get().timeout(const Duration(seconds: 8));
       if (!userDoc.exists) {
-        final cpDoc = await _firestore.collection('cps').doc(requestedUserId).get();
-        if (cpDoc.exists) {
-             final validationError = _applyUserDocument(cpDoc);
-             if (validationError != null) return false;
-             if (updateLoginAudit) await _updateLastLogin(cpDoc);
-             _listenToCurrentUser(cpDoc.id);
-             return true;
+        userDoc = await _firestore.collection('users').doc(requestedUserId).get().timeout(const Duration(seconds: 8));
+        if (!userDoc.exists) {
+          final cpDoc = await _firestore.collection('cps').doc(requestedUserId).get().timeout(const Duration(seconds: 8));
+          if (cpDoc.exists) {
+               final validationError = _applyUserDocument(cpDoc);
+               if (validationError != null) return false;
+               if (updateLoginAudit) await _updateLastLogin(cpDoc);
+               _listenToCurrentUser(cpDoc.id);
+               return true;
+          }
+          return false;
         }
-        return false;
       }
+      final validationError = _applyUserDocument(userDoc);
+      if (validationError != null) return false;
+      if (updateLoginAudit) await _updateLastLogin(userDoc);
+      _listenToCurrentUser(userDoc.id);
+      return true;
+    } catch (e) {
+      debugPrint('AUTH: loadUserById error: $e');
+      return false;
     }
-    final validationError = _applyUserDocument(userDoc);
-    if (validationError != null) return false;
-    if (updateLoginAudit) await _updateLastLogin(userDoc);
-    _listenToCurrentUser(userDoc.id);
-    return true;
   }
 
   Future<bool> _loadUserById(
@@ -590,7 +605,7 @@ class AuthViewModel extends ChangeNotifier {
 
   Future<void> _updateLastLogin(DocumentSnapshot<Map<String, dynamic>> userDoc) async {
     try {
-      await userDoc.reference.update({ 'lastLogin': FieldValue.serverTimestamp() });
+      await userDoc.reference.update({ 'lastLogin': FieldValue.serverTimestamp() }).timeout(const Duration(seconds: 8));
       syncFcmToken();
     } catch (_) {}
   }
