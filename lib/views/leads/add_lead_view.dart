@@ -15,6 +15,7 @@ import '../../viewmodels/project_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/app_configuration_viewmodel.dart';
 import '../../models/lead_model.dart';
+import '../../models/cp_model.dart';
 import '../../utils/lead_form_config.dart';
 import '../../utils/role_permissions.dart';
 
@@ -122,13 +123,58 @@ class _AddLeadViewState extends State<AddLeadView> {
       }
     }
 
-    if (_flatFields.isNotEmpty && _resolvedLead == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_flatFields.isNotEmpty && _resolvedLead == null) {
         _focusNodes['company']?.requestFocus();
-      });
-    }
+      }
+      final state = GoRouterState.of(context);
+      final String? refFromLink = state.uri.queryParameters['ref'];
+      if (refFromLink != null && refFromLink.isNotEmpty && _resolvedLead == null) {
+        setState(() {
+          _formData['source'] = 'Referral';
+          _formData['referralName1'] = refFromLink;
+          _controllers['referralName1']?.text = refFromLink;
+          _updateMultiLevelReferrals(refFromLink);
+        });
+      }
+    });
 
     _setupCalculations();
+  }
+
+  void _updateMultiLevelReferrals(String ref1Name) {
+    if (ref1Name.trim().isEmpty) return;
+    final cpVM = Provider.of<CPViewModel>(context, listen: false);
+    
+    final cp1 = cpVM.cps.firstWhere(
+      (c) => c.cpName.toLowerCase() == ref1Name.trim().toLowerCase() || c.fullName.toLowerCase() == ref1Name.trim().toLowerCase(),
+      orElse: () => CPModel.fromMap({}, ''),
+    );
+
+    if (cp1.id.isNotEmpty) {
+      final String ref2 = (cp1.rawData['referralName1'] ?? '').toString();
+      final String ref3 = (cp1.rawData['referralName2'] ?? '').toString();
+
+      setState(() {
+        _formData['referralName2'] = ref2.isEmpty ? 'Not available' : ref2;
+        _controllers['referralName2']?.text = _formData['referralName2'];
+
+        _formData['referralName3'] = ref3.isEmpty ? 'Not available' : ref3;
+        _controllers['referralName3']?.text = _formData['referralName3'];
+      });
+    } else {
+      setState(() {
+        _formData['referralName2'] = 'Not available'; _controllers['referralName2']?.text = 'Not available';
+        _formData['referralName3'] = 'Not available'; _controllers['referralName3']?.text = 'Not available';
+      });
+    }
+  }
+
+  void _onFieldChanged(String id, String val) {
+    _formData[id] = val;
+    if (id == 'referralName1') {
+      _updateMultiLevelReferrals(val);
+    }
   }
 
   void _setupCalculations() {
@@ -858,7 +904,7 @@ class _AddLeadViewState extends State<AddLeadView> {
             onSelected: (String selection) {
               setState(() {
                 controller.text = selection;
-                _formData[id] = selection;
+                _onFieldChanged(id, selection);
                 _openDropdowns[id] = false; 
               });
               optionSelected = true;
@@ -881,7 +927,7 @@ class _AddLeadViewState extends State<AddLeadView> {
                                   text: match,
                                   selection: TextSelection.collapsed(offset: match.length),
                                 );
-                                _formData[id] = match;
+                                _onFieldChanged(id, match);
                               });
                             });
                             return KeyEventResult.handled;
@@ -901,7 +947,7 @@ class _AddLeadViewState extends State<AddLeadView> {
                   style: const TextStyle(fontSize: 15),
                   textInputAction: TextInputAction.next,
                   onChanged: (val) {
-                    _formData[id] = val;
+                    _onFieldChanged(id, val);
                   },
                   onTap: () {
                     if (textCtrl.text.isEmpty) {

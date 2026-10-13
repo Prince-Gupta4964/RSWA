@@ -161,8 +161,8 @@ class LeadFormStrings {
           ]
         },
         {"id": "referralName1", "label": labelReferralName1, "type": "cp_dropdown", "visibleIf": "source == Referral"},
-        {"id": "referralName2", "label": labelReferralName2, "type": "cp_dropdown", "visibleIf": "source == Referral", "hideIf": "role != super_admin"},
-        {"id": "referralName3", "label": labelReferralName3, "type": "cp_dropdown", "visibleIf": "source == Referral", "hideIf": "role != super_admin"},
+        {"id": "referralName2", "label": labelReferralName2, "type": "text", "readOnly": true, "visibleIf": "source == Referral", "hideIf": "role != super_admin"},
+        {"id": "referralName3", "label": labelReferralName3, "type": "text", "readOnly": true, "visibleIf": "source == Referral", "hideIf": "role != super_admin"},
         {"id": "isPrivate", "label": labelIsPrivate, "type": "switch", "initialValue": true},
         {"id": "sendProjectDetails", "label": labelSendProjectDetails, "type": "switch", "initialValue": false},
         {"id": "propertyType", "label": labelPropertyType, "type": "chips", "options": ["Flat", "Bungalow", "Land", "Others"]},
