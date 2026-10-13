@@ -127,6 +127,36 @@ class _AddLeadViewState extends State<AddLeadView> {
         _focusNodes['company']?.requestFocus();
       });
     }
+
+    _setupCalculations();
+  }
+
+  void _setupCalculations() {
+    void calculate() {
+      final flatCost = double.tryParse(_controllers['flatCost']?.text.replaceAll(',', '') ?? '') ?? 0.0;
+      final area = double.tryParse(_controllers['landSqFt']?.text.replaceAll(',', '') ?? '') ?? 0.0;
+      final agreementVal = double.tryParse(_controllers['agreementValue']?.text.replaceAll(',', '') ?? '') ?? 0.0;
+
+      if (area > 0 && flatCost > 0) {
+        final rate = flatCost / area;
+        _controllers['ratePerSqFt']?.text = rate.toStringAsFixed(2);
+        _formData['ratePerSqFt'] = rate.toStringAsFixed(2);
+      }
+
+      if (agreementVal > 0) {
+        final srg = agreementVal * 0.09;
+        _controllers['srgAmount']?.text = srg.toStringAsFixed(2);
+        _formData['srgAmount'] = srg.toStringAsFixed(2);
+
+        final totalPkg = flatCost + srg;
+        _controllers['totalPackageAmount']?.text = totalPkg.toStringAsFixed(2);
+        _formData['totalPackageAmount'] = totalPkg.toStringAsFixed(2);
+      }
+    }
+
+    _controllers['flatCost']?.addListener(calculate);
+    _controllers['landSqFt']?.addListener(calculate);
+    _controllers['agreementValue']?.addListener(calculate);
   }
 
   void _initializeField(Map<String, dynamic> field, Map<String, dynamic> existingData) {
