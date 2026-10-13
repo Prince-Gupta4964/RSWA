@@ -648,6 +648,12 @@ class _AddLeadViewState extends State<AddLeadView> {
 
   Widget _buildSection(Map<String, dynamic> section) {
     final String title = section['title'];
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    if (title == LeadFormStrings.sectionHiddenDetails) {
+      if (authVM.appRole != AppRole.superAdmin && authVM.appRole != AppRole.admin) {
+        return const SizedBox.shrink();
+      }
+    }
     final bool isExpanded = _expandedSections.contains(title);
     final key = _sectionKeys.putIfAbsent(title, () => GlobalKey());
 

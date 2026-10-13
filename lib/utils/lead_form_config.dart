@@ -4,7 +4,7 @@ class LeadFormStrings {
   static const String sectionClientDetails = "Client Details";
   static const String sectionOtherDetails = "Other Details";
   static const String sectionPaidDetails = "Paid Details";
-  static const String sectionHiddenDetails = "Hidden Details #Admin";
+  static const String sectionHiddenDetails = "Hidden Details";
 
   // --- FIELD LABELS ---
   static const String labelID = "Lead ID";

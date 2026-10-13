@@ -166,11 +166,12 @@ class _LeadDetailViewState extends State<LeadDetailView> {
                 ]),
                 const SizedBox(height: 12.0),
                 
-                _buildSection('Performance & Scores', Icons.analytics_outlined, [
-                   _detailRow('Lead Score', data['leadScore']),
-                   _detailRow('Referral Score', data['referralScore']),
-                   _detailRow('Advisor Score', data['advisorScore']),
-                ]),
+                if (authVM.appRole == AppRole.superAdmin || authVM.appRole == AppRole.admin)
+                  _buildSection('Performance & Scores', Icons.analytics_outlined, [
+                     _detailRow('Lead Score', data['leadScore']),
+                     _detailRow('Referral Score', data['referralScore']),
+                     _detailRow('Advisor Score', data['advisorScore']),
+                  ]),
               ],
             ),
           ),
