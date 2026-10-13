@@ -1067,13 +1067,13 @@ class _AddLeadViewState extends State<AddLeadView> {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          Expanded(child: fieldWidget),
+          const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.add_circle, size: 24, color: Color(0xFFFF6B22)),
             onPressed: () => setState(() => _showContact2 = true),
             tooltip: 'Add Contact 2',
           ),
-          const SizedBox(width: 8),
-          Expanded(child: fieldWidget),
         ],
       );
     }
