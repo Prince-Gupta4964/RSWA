@@ -285,8 +285,8 @@ class AppConfigurationViewModel extends ChangeNotifier {
   }
 
   List<Map<String, dynamic>> getFormStructure(String formName, List<Map<String, dynamic>> defaultStructure) {
-    if (!_formLabelsConfig.containsKey(formName)) return defaultStructure;
-    final savedFields = _formLabelsConfig[formName]!;
+    // Always use defaultStructure as the master sequence blueprint, applying saved overrides if present
+    final savedFields = _formLabelsConfig[formName] ?? [];
     
     final Map<String, Map<String, dynamic>> overrideMap = {};
     for (var sf in savedFields) {
