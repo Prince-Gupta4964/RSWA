@@ -91,7 +91,9 @@ class AppDrawer extends StatelessWidget {
                 subtitle: const Text('Invite new partners to join', style: TextStyle(fontSize: 11)),
                 onTap: () {
                   final String baseUrl = Uri.base.origin; 
-                  final refLink = "$baseUrl/#/login?ref=${authVM.userData?['contactNo']}";
+                  final String rawContact = (authVM.userData?['contactNo'] ?? '').toString().trim();
+                  final String cleanContact = rawContact.replaceAll(RegExp(r'\s+'), '');
+                  final refLink = "$baseUrl/#/login?ref=$cleanContact";
                   Clipboard.setData(ClipboardData(text: refLink));
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
