@@ -1092,7 +1092,6 @@ class _AddLeadViewState extends State<AddLeadView> {
     }
     return fieldWidget;
   }
-  }
 
   Widget _buildStatusChips(String label, String id) {
     return Consumer<AppConfigurationViewModel>(
