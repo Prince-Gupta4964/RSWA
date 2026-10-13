@@ -14,8 +14,10 @@ import '../../viewmodels/cp_viewmodel.dart';
 import '../../viewmodels/project_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/app_configuration_viewmodel.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/lead_model.dart';
 import '../../models/cp_model.dart';
+import '../../models/project_model.dart';
 import '../../utils/lead_form_config.dart';
 import '../../utils/role_permissions.dart';
 
@@ -1443,6 +1445,40 @@ class _AddLeadViewState extends State<AddLeadView> {
         id: _resolvedLead?.id ?? widget.leadId,
         actorMetadata: authVM.actorMetadata,
       );
+
+      // Send Project Details via WhatsApp if enabled
+      final sendDetailsVal = _formData['sendProjectDetails'];
+      final bool sendDetails = sendDetailsVal == true || sendDetailsVal == 'Yes';
+      if (sendDetails) {
+        final String leadPhone = (_formData['whatsapp'] ?? _formData['contact2'] ?? '').toString().trim();
+        final String projectName = (_formData['project'] ?? _formData['selectProject'] ?? '').toString().trim();
+        if (leadPhone.isNotEmpty && projectName.isNotEmpty) {
+          final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+          final project = projectVM.projects.firstWhere(
+            (p) => p.projectName.trim().toLowerCase() == projectName.toLowerCase(),
+            orElse: () => ProjectModel.fromMap({}, ''),
+          );
+          if (project.id.isNotEmpty) {
+            final String location = project.displayLocation;
+            final String baseUrl = Uri.base.origin;
+            final String encodedName = Uri.encodeComponent(project.projectName);
+            final String shareLink = "$baseUrl/#/share/project/$encodedName";
+
+            final String message = "Property+\n\n"
+                "🏢 Building: ${project.projectName}\n"
+                "📍 Location: $location\n\n"
+                "🔗 View Property Details & Photos:\n$shareLink";
+
+            String cleanPhone = leadPhone.replaceAll(RegExp(r'[^0-9]'), '');
+            if (cleanPhone.length >= 10) {
+              final Uri whatsappUri = Uri.parse('https://wa.me/91${cleanPhone.substring(cleanPhone.length - 10)}?text=${Uri.encodeComponent(message)}');
+              if (await canLaunchUrl(whatsappUri)) {
+                await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+              }
+            }
+          }
+        }
+      }
 
       final String hasMediaToUpload = _pickedImages.values.any((f) => f != null)
           ? ' Photos uploading in background...'
