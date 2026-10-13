@@ -379,40 +379,52 @@ class AuthViewModel extends ChangeNotifier {
     String rawEmail,
     String normalizedEmail,
   ) async {
-    final candidateIds = <String>{
-      rawEmail.trim(),
-      normalizedEmail,
-    }..removeWhere((value) => value.isEmpty);
+    debugPrint('AUTH: Searching users, cps, and customers for email: $normalizedEmail');
 
-    debugPrint('AUTH: Checking user documents by ID: $candidateIds');
-    for (final documentId in candidateIds) {
-      try {
-        final userDoc = await _firestore.collection('users').doc(documentId).get().timeout(const Duration(seconds: 8));
-        if (userDoc.exists) return userDoc;
-      } catch (e) {
-        debugPrint('AUTH: Doc lookup error for $documentId: $e');
+    // 1. Check users collection
+    try {
+      final usersSnapshot = await _firestore.collection('users').get().timeout(const Duration(seconds: 8));
+      for (var doc in usersSnapshot.docs) {
+        final data = doc.data();
+        final e1 = (data['email'] ?? '').toString().trim().toLowerCase();
+        final e2 = (data['email_login'] ?? '').toString().trim().toLowerCase();
+        final e3 = (data['emailAddress'] ?? '').toString().trim().toLowerCase();
+        if (e1 == normalizedEmail || e2 == normalizedEmail || e3 == normalizedEmail || doc.id.trim().toLowerCase() == normalizedEmail) {
+          return doc;
+        }
       }
+    } catch (e) {
+      debugPrint('AUTH: Users search error: $e');
     }
 
-    debugPrint('AUTH: Falling back to field query for email: $normalizedEmail');
+    // 2. Check cps collection
     try {
-      final normalizedQuery = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: normalizedEmail)
-          .limit(1)
-          .get()
-          .timeout(const Duration(seconds: 8));
-      if (normalizedQuery.docs.isNotEmpty) return normalizedQuery.docs.first;
-
-      final cpQuery = await _firestore
-          .collection('cps')
-          .where('email', isEqualTo: normalizedEmail)
-          .limit(1)
-          .get()
-          .timeout(const Duration(seconds: 8));
-      if (cpQuery.docs.isNotEmpty) return cpQuery.docs.first;
+      final cpsSnapshot = await _firestore.collection('cps').get().timeout(const Duration(seconds: 8));
+      for (var doc in cpsSnapshot.docs) {
+        final data = doc.data();
+        final e1 = (data['email'] ?? '').toString().trim().toLowerCase();
+        final e2 = (data['email_login'] ?? '').toString().trim().toLowerCase();
+        final e3 = (data['emailAddress'] ?? '').toString().trim().toLowerCase();
+        if (e1 == normalizedEmail || e2 == normalizedEmail || e3 == normalizedEmail || doc.id.trim().toLowerCase() == normalizedEmail) {
+          return doc;
+        }
+      }
     } catch (e) {
-      debugPrint('AUTH: Field query error: $e');
+      debugPrint('AUTH: CPs search error: $e');
+    }
+
+    // 3. Check customers collection
+    try {
+      final custSnapshot = await _firestore.collection('customers').get().timeout(const Duration(seconds: 8));
+      for (var doc in custSnapshot.docs) {
+        final data = doc.data();
+        final e1 = (data['email'] ?? '').toString().trim().toLowerCase();
+        if (e1 == normalizedEmail || doc.id.trim().toLowerCase() == normalizedEmail) {
+          return doc;
+        }
+      }
+    } catch (e) {
+      debugPrint('AUTH: Customers search error: $e');
     }
 
     return null;
@@ -557,11 +569,16 @@ class AuthViewModel extends ChangeNotifier {
         : directRole;
     
     if (permissionRole == AppRole.unknown || storedRole.isEmpty) {
-      _clearSessionData();
-      return 'Invalid role.';
+      if (isFromCPS) {
+        storedRole = 'cp';
+      } else {
+        _clearSessionData();
+        return 'Invalid role.';
+      }
     }
 
-    if (!skipPassword && password != null && data['password']?.toString() != password) {
+    final storedPassword = (data['password'] ?? data['loginPassword'] ?? data['pass'] ?? '').toString();
+    if (!skipPassword && password != null && storedPassword != password) {
       _clearSessionData();
       return 'Incorrect credentials.';
     }
