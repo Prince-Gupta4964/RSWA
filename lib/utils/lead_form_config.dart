@@ -186,14 +186,10 @@ class LeadFormStrings {
         {"id": "totalPackageAmount", "label": labelTotalPackageAmount, "type": "number", "readOnly": true},
         {"id": "address", "label": labelAddress, "type": "multiline"},
         {"id": "email", "label": labelEmail, "type": "text"},
-        {"id": "gender", "label": labelGender, "type": "chips", "options": ["Male", "Female", "Others"]},
-        {"id": "demoDone", "label": labelDemoDone, "type": "switch"},
-        {"id": "demoType", "label": labelDemoType, "type": "dropdown", "options": demoTypes, "visibleIf": "demoDone == Yes"},
-        {"id": "demoBy", "label": labelDemoBy, "type": "text", "visibleIf": "demoDone == Yes", "readOnly": true},
-        {"id": "livingIn", "label": labelNowLivingIn, "type": "text"},
         {"id": "budget", "label": labelBudget, "type": "number"},
         {"id": "monthlyIncome", "label": labelMonthlyIncome, "type": "number"},
         {"id": "remark", "label": labelRemark, "type": "multiline"},
+        {"id": "gender", "label": labelGender, "type": "chips", "options": ["Male", "Female", "Others"]},
       ]
     },
     {
