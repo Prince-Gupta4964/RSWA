@@ -388,52 +388,34 @@ class AuthViewModel extends ChangeNotifier {
     String rawEmail,
     String normalizedEmail,
   ) async {
-    debugPrint('AUTH: Searching users, cps, and customers for email: $normalizedEmail');
+    debugPrint('AUTH: Direct lookup for email: $normalizedEmail');
 
-    // 1. Check users collection
-    try {
-      final usersSnapshot = await _firestore.collection('users').get().timeout(const Duration(seconds: 8));
-      for (var doc in usersSnapshot.docs) {
-        final data = doc.data();
-        final e1 = (data['email'] ?? '').toString().trim().toLowerCase();
-        final e2 = (data['email_login'] ?? '').toString().trim().toLowerCase();
-        final e3 = (data['emailAddress'] ?? '').toString().trim().toLowerCase();
-        if (e1 == normalizedEmail || e2 == normalizedEmail || e3 == normalizedEmail || doc.id.trim().toLowerCase() == normalizedEmail) {
-          return doc;
+    final collections = ['users', 'cps', 'customers'];
+    for (final col in collections) {
+      try {
+        final doc = await _firestore.collection(col).doc(normalizedEmail).get().timeout(const Duration(seconds: 6));
+        if (doc.exists) return doc;
+        
+        if (rawEmail.trim() != normalizedEmail) {
+          final docRaw = await _firestore.collection(col).doc(rawEmail.trim()).get().timeout(const Duration(seconds: 6));
+          if (docRaw.exists) return docRaw;
         }
+      } catch (e) {
+        debugPrint('AUTH: Doc lookup in $col error: $e');
       }
-    } catch (e) {
-      debugPrint('AUTH: Users search error: $e');
     }
 
-    // 2. Check cps collection
+    // Fallback: If document ID is not email, try query
     try {
-      final cpsSnapshot = await _firestore.collection('cps').get().timeout(const Duration(seconds: 8));
-      for (var doc in cpsSnapshot.docs) {
-        final data = doc.data();
-        final e1 = (data['email'] ?? '').toString().trim().toLowerCase();
-        final e2 = (data['email_login'] ?? '').toString().trim().toLowerCase();
-        final e3 = (data['emailAddress'] ?? '').toString().trim().toLowerCase();
-        if (e1 == normalizedEmail || e2 == normalizedEmail || e3 == normalizedEmail || doc.id.trim().toLowerCase() == normalizedEmail) {
-          return doc;
-        }
-      }
-    } catch (e) {
-      debugPrint('AUTH: CPs search error: $e');
-    }
+      for (final col in collections) {
+        final query = await _firestore.collection(col).where('email', isEqualTo: normalizedEmail).limit(1).get().timeout(const Duration(seconds: 6));
+        if (query.docs.isNotEmpty) return query.docs.first;
 
-    // 3. Check customers collection
-    try {
-      final custSnapshot = await _firestore.collection('customers').get().timeout(const Duration(seconds: 8));
-      for (var doc in custSnapshot.docs) {
-        final data = doc.data();
-        final e1 = (data['email'] ?? '').toString().trim().toLowerCase();
-        if (e1 == normalizedEmail || doc.id.trim().toLowerCase() == normalizedEmail) {
-          return doc;
-        }
+        final queryLogin = await _firestore.collection(col).where('email_login', isEqualTo: normalizedEmail).limit(1).get().timeout(const Duration(seconds: 6));
+        if (queryLogin.docs.isNotEmpty) return queryLogin.docs.first;
       }
     } catch (e) {
-      debugPrint('AUTH: Customers search error: $e');
+      debugPrint('AUTH: Fallback query error: $e');
     }
 
     return null;

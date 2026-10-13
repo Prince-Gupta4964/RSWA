@@ -84,9 +84,9 @@ class UserManagementViewModel extends ChangeNotifier {
 
     if (existingUser == null) {
       payload['createdAt'] = FieldValue.serverTimestamp();
-      await _db.collection('users').add(payload);
+      await _db.collection('users').doc(normalizedEmail).set(payload);
     } else {
-      await _db.collection('users').doc(existingUser.id).update(payload);
+      await _db.collection('users').doc(normalizedEmail).set(payload, SetOptions(merge: true));
     }
   }
 
