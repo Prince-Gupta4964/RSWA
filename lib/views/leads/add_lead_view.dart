@@ -1064,22 +1064,16 @@ class _AddLeadViewState extends State<AddLeadView> {
     );
 
     if (id == 'whatsapp' && !_showContact2) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          fieldWidget,
-          const SizedBox(height: 6),
-          GestureDetector(
-            onTap: () => setState(() => _showContact2 = true),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.add_circle, size: 18, color: Color(0xFFFF6B22)),
-                SizedBox(width: 6),
-                Text("Add Contact 2", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFF6B22))),
-              ],
-            ),
+          IconButton(
+            icon: const Icon(Icons.add_circle, size: 24, color: Color(0xFFFF6B22)),
+            onPressed: () => setState(() => _showContact2 = true),
+            tooltip: 'Add Contact 2',
           ),
+          const SizedBox(width: 8),
+          Expanded(child: fieldWidget),
         ],
       );
     }
