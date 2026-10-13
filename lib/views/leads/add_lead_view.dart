@@ -1447,7 +1447,7 @@ class _AddLeadViewState extends State<AddLeadView> {
         actorMetadata: authVM.actorMetadata,
       );
 
-      // Send Project Details via WhatsApp API if enabled
+      // Send Project Details via WhatsApp (Hybrid: url_launcher on Web, Deropo API on APK)
       final sendDetailsVal = _formData['sendProjectDetails'];
       final bool sendDetails = sendDetailsVal == true || sendDetailsVal == 'Yes';
       if (sendDetails) {
@@ -1461,7 +1461,7 @@ class _AddLeadViewState extends State<AddLeadView> {
           );
           if (project.id.isNotEmpty) {
             final String location = project.displayLocation;
-            final String baseUrl = Uri.base.origin;
+            final String baseUrl = (kIsWeb && Uri.base.hasAuthority) ? Uri.base.origin : 'https://propertyplus.web.app';
             final String encodedName = Uri.encodeComponent(project.projectName);
             final String shareLink = "$baseUrl/#/share/project/$encodedName";
 
@@ -1470,10 +1470,20 @@ class _AddLeadViewState extends State<AddLeadView> {
                 "📍 Location: $location\n\n"
                 "🔗 View Property Details & Photos:\n$shareLink";
 
-            await WhatsAppApiService.sendMessage(
-              phoneNumber: leadPhone,
-              message: message,
-            );
+            if (kIsWeb) {
+              String cleanPhone = leadPhone.replaceAll(RegExp(r'[^0-9]'), '');
+              if (cleanPhone.length >= 10) {
+                final Uri whatsappUri = Uri.parse('https://wa.me/91${cleanPhone.substring(cleanPhone.length - 10)}?text=${Uri.encodeComponent(message)}');
+                if (await canLaunchUrl(whatsappUri)) {
+                  await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+                }
+              }
+            } else {
+              await WhatsAppApiService.sendMessage(
+                phoneNumber: leadPhone,
+                message: message,
+              );
+            }
           }
         }
       }

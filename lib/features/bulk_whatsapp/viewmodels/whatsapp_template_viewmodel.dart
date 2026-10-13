@@ -21,13 +21,15 @@ class WhatsAppTemplateViewModel extends ChangeNotifier {
             .collection('whatsapp_templates')
             .where('createdByUid', isEqualTo: userUid)
             .orderBy('createdAt', descending: true)
-            .get();
+            .get()
+            .timeout(const Duration(seconds: 8));
       } catch (e) {
         debugPrint('Index query failed, falling back to simple query: $e');
         snapshot = await _firestore
             .collection('whatsapp_templates')
             .where('createdByUid', isEqualTo: userUid)
-            .get();
+            .get()
+            .timeout(const Duration(seconds: 8));
       }
 
       _templates = snapshot.docs
