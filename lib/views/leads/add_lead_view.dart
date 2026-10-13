@@ -1068,6 +1068,9 @@ class _AddLeadViewState extends State<AddLeadView> {
                     selectedColor: isHighlighted ? primaryColor : primaryColor.withValues(alpha: 0.6),
                     backgroundColor: const Color(0xFFF5F5F5),
                     checkmarkColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                    visualDensity: VisualDensity.compact,
                     onSelected: (val) {
                       setState(() {
                         _formData[id] = val ? opt : null;
