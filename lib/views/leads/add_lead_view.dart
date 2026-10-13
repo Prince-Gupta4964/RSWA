@@ -1036,58 +1036,53 @@ class _AddLeadViewState extends State<AddLeadView> {
       },
       child: Padding(
         padding: const EdgeInsets.only(bottom: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 4.0),
-              child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87)),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: options.asMap().entries.map((entry) {
-                int idx = entry.key;
-                String opt = entry.value;
-                final bool isSelected = _formData[id] == opt;
-                final bool isHighlighted = isFocused && activeIdx == idx;
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.start,
+            crossAxisAlignment: WrapCrossAlignment.start,
+            children: options.asMap().entries.map((entry) {
+              int idx = entry.key;
+              String opt = entry.value;
+              final bool isSelected = _formData[id] == opt;
+              final bool isHighlighted = isFocused && activeIdx == idx;
 
-                return GestureDetector(
-                  onDoubleTap: () {
+              return GestureDetector(
+                onDoubleTap: () {
+                  setState(() {
+                    _formData[id] = opt;
+                    _activeChipIndex[id] = idx;
+                    _currentFocusedId = id;
+                  });
+                  _focusNextField();
+                },
+                child: ChoiceChip(
+                  label: Text(opt, style: TextStyle(fontSize: 12, color: isSelected || isHighlighted ? Colors.black : Colors.black87, fontWeight: isSelected || isHighlighted ? FontWeight.bold : FontWeight.normal)),
+                  selected: isSelected || isHighlighted,
+                  selectedColor: isHighlighted ? primaryColor : primaryColor.withValues(alpha: 0.6),
+                  backgroundColor: const Color(0xFFF5F5F5),
+                  showCheckmark: false,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  visualDensity: VisualDensity.compact,
+                  onSelected: (val) {
                     setState(() {
-                      _formData[id] = opt;
+                      _formData[id] = val ? opt : null;
                       _activeChipIndex[id] = idx;
                       _currentFocusedId = id;
                     });
-                    _focusNextField();
+                    _focusNodes[id]!.requestFocus();
                   },
-                  child: ChoiceChip(
-                    label: Text(opt, style: TextStyle(fontSize: 12, color: isSelected || isHighlighted ? Colors.black : Colors.black87, fontWeight: isSelected || isHighlighted ? FontWeight.bold : FontWeight.normal)),
-                    selected: isSelected || isHighlighted,
-                    selectedColor: isHighlighted ? primaryColor : primaryColor.withValues(alpha: 0.6),
-                    backgroundColor: const Color(0xFFF5F5F5),
-                    checkmarkColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                    visualDensity: VisualDensity.compact,
-                    onSelected: (val) {
-                      setState(() {
-                        _formData[id] = val ? opt : null;
-                        _activeChipIndex[id] = idx;
-                        _currentFocusedId = id;
-                      });
-                      _focusNodes[id]!.requestFocus();
-                    },
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: isHighlighted ? const BorderSide(color: secondaryColor, width: 1.5) : BorderSide.none
-                    ),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: isHighlighted ? const BorderSide(color: secondaryColor, width: 1.5) : BorderSide.none
                   ),
-                );
-              }).toList(),
-            ),
-          ],
+                ),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
