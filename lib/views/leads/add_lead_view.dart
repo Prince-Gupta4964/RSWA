@@ -1470,20 +1470,10 @@ class _AddLeadViewState extends State<AddLeadView> {
                 "📍 Location: $location\n\n"
                 "🔗 View Property Details & Photos:\n$shareLink";
 
-            if (kIsWeb) {
-              String cleanPhone = leadPhone.replaceAll(RegExp(r'[^0-9]'), '');
-              if (cleanPhone.length >= 10) {
-                final Uri whatsappUri = Uri.parse('https://wa.me/91${cleanPhone.substring(cleanPhone.length - 10)}?text=${Uri.encodeComponent(message)}');
-                if (await canLaunchUrl(whatsappUri)) {
-                  await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
-                }
-              }
-            } else {
-              await WhatsAppApiService.sendMessage(
-                phoneNumber: leadPhone,
-                message: message,
-              );
-            }
+            await WhatsAppApiService.sendMessage(
+              phoneNumber: leadPhone,
+              message: message,
+            );
           }
         }
       }

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'whatsapp_api_helper.dart';
 
 class WhatsAppApiService {
@@ -35,6 +36,22 @@ class WhatsAppApiService {
     try {
       final formattedNumber = _formatPhoneNumber(phoneNumber);
       if (formattedNumber.isEmpty) return false;
+
+      // On Web, direct HTTP calls to third-party Deropo API throw CORS errors.
+      // Fallback to launching WhatsApp Web via url_launcher.
+      if (kIsWeb) {
+        String cleanNum = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+        if (cleanNum.length >= 10) {
+          final phone10 = cleanNum.substring(cleanNum.length - 10);
+          final textToSend = message ?? "";
+          final Uri whatsappUri = Uri.parse('https://wa.me/91$phone10?text=${Uri.encodeComponent(textToSend)}');
+          if (await canLaunchUrl(whatsappUri)) {
+            await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+            return true;
+          }
+        }
+        return false;
+      }
 
       // If buttons are present, ensure type is 'buttons'
       if (buttons != null && buttons.isNotEmpty && type != 'buttons') {
