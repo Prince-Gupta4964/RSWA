@@ -56,6 +56,7 @@ class _AddLeadViewState extends State<AddLeadView> {
   static const Color primaryColor = Color(0xFFFBE64E);
   static const Color secondaryColor = Color(0xFF6B5800);
 
+  bool _showContact2 = false;
   bool _isInit = false;
 
   @override
@@ -103,6 +104,10 @@ class _AddLeadViewState extends State<AddLeadView> {
     if (_resolvedLead == null && authVM.appRole == AppRole.cp) {
       _formData['referralName1'] = authVM.userName;
       _formData['source'] = 'Referral';
+    }
+
+    if (existingData['contact2'] != null && existingData['contact2'].toString().isNotEmpty) {
+      _showContact2 = true;
     }
 
     for (var section in _formStructure) {
@@ -167,6 +172,13 @@ class _AddLeadViewState extends State<AddLeadView> {
         _formData['referralName2'] = 'Not available'; _controllers['referralName2']?.text = 'Not available';
         _formData['referralName3'] = 'Not available'; _controllers['referralName3']?.text = 'Not available';
       });
+    }
+  }
+
+  void _onFieldChanged(String id, String val) {
+    _formData[id] = val;
+    if (id == 'referralName1') {
+      _updateMultiLevelReferrals(val);
     }
   }
 
@@ -460,6 +472,11 @@ class _AddLeadViewState extends State<AddLeadView> {
   }
 
   bool _isFieldVisible(String fieldId) {
+    if (fieldId == 'contact2') {
+      final val = _formData['contact2']?.toString() ?? '';
+      if (!_showContact2 && val.isEmpty) return false;
+    }
+
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     
     Map<String, dynamic>? config;
@@ -888,7 +905,7 @@ class _AddLeadViewState extends State<AddLeadView> {
     bool optionSelected = false;
     bool isListOpen = _openDropdowns[id] ?? false; 
 
-    return LayoutBuilder(
+    Widget fieldWidget = LayoutBuilder(
       builder: (context, constraints) {
         return CompositedTransformTarget(
           link: link,
@@ -965,9 +982,24 @@ class _AddLeadViewState extends State<AddLeadView> {
                     });
                   },
                   decoration: _outlinedDecoration(label, id).copyWith(
+                    prefixIcon: id == 'whatsapp'
+                      ? IconButton(
+                          icon: Icon(
+                            (_formData['isPrivate'] ?? true) ? Icons.lock : Icons.lock_open,
+                            color: (_formData['isPrivate'] ?? true) ? const Color(0xFFFF6B22) : Colors.grey,
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              bool current = _formData['isPrivate'] ?? true;
+                              _formData['isPrivate'] = !current;
+                            });
+                          },
+                        )
+                      : null,
                     suffixIcon: (id == 'whatsapp' || id == 'contact2') 
                       ? IconButton(
-                          icon: const Icon(Icons.contact_phone_outlined, color: Color(0xFFFF6B22)),
+                          icon: const Icon(Icons.contacts_rounded, color: Color(0xFFFF6B22)),
                           onPressed: () => _pickNumberFromContacts(id),
                         )
                       : (finalOptions.isNotEmpty ? IconButton(
@@ -1037,6 +1069,29 @@ class _AddLeadViewState extends State<AddLeadView> {
         );
       },
     );
+
+    if (id == 'whatsapp' && !_showContact2) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          fieldWidget,
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: () => setState(() => _showContact2 = true),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.add_circle, size: 18, color: Color(0xFFFF6B22)),
+                SizedBox(width: 6),
+                Text("Add Contact 2", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFF6B22))),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+    return fieldWidget;
+  }
   }
 
   Widget _buildStatusChips(String label, String id) {
