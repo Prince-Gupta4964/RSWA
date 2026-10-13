@@ -1,3 +1,5 @@
+import '../utils/role_permissions.dart';
+
 class LeadModel {
   final String id;
   final String name;
@@ -12,6 +14,22 @@ class LeadModel {
     return surname.isNotEmpty && !firstName.toLowerCase().contains(surname.toLowerCase())
         ? '$firstName $surname'
         : firstName;
+  }
+
+  bool get isPrivate {
+    final v = rawData['isPrivate'];
+    return v == true || v == 'Yes' || v == 'true';
+  }
+
+  String getDisplayContact(String? currentUserId, String? currentUserName, AppRole userRole) {
+    if (!isPrivate) return contact;
+    final String leadUserId = (rawData['userId'] ?? '').toString();
+    final String leadCreatedBy = (rawData['createdBy'] ?? '').toString();
+    final bool isCreator = (currentUserId != null && currentUserId.isNotEmpty && leadUserId == currentUserId) ||
+                           (currentUserName != null && currentUserName.isNotEmpty && leadCreatedBy.toLowerCase() == currentUserName.toLowerCase());
+    final bool isAdmin = userRole == AppRole.superAdmin || userRole == AppRole.admin;
+    if (isCreator || isAdmin) return contact;
+    return "••••••••••";
   }
 
   LeadModel({

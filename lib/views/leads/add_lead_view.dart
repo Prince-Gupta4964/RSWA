@@ -1422,6 +1422,8 @@ class _AddLeadViewState extends State<AddLeadView> {
     setState(() => _isSaving = true);
     try {
       final authVM = Provider.of<AuthViewModel>(context, listen: false);
+      _formData['userId'] = authVM.userId ?? '';
+      _formData['createdBy'] = authVM.userName ?? '';
       final String leadName = '${_formData['leadName'] ?? 'lead'}_${DateTime.now().millisecondsSinceEpoch}';
 
       final String targetLeadId = _resolvedLead?.id ?? widget.leadId ?? _generateUniqueID();

@@ -286,10 +286,11 @@ class _LeadTileState extends State<_LeadTile> {
 
   Widget _buildModernTile(BuildContext context) {
     final leadVM = Provider.of<LeadViewModel>(context, listen: false);
+    final authVM = Provider.of<AuthViewModel>(context);
+    final displayContact = widget.lead.getDisplayContact(authVM.userId, authVM.userName, authVM.appRole);
     final String firstLetter = widget.lead.fullName.trim().isEmpty ? '?' : widget.lead.fullName.trim()[0].toUpperCase();
     final displayStatus = _optimisticStatus ?? widget.lead.status;
     final tagColor = _statusColor(displayStatus);
-    final authVM = Provider.of<AuthViewModel>(context, listen: false);
 
     return Container(
       color: Colors.white,
@@ -341,9 +342,9 @@ class _LeadTileState extends State<_LeadTile> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => _makeCall(context, widget.lead.contact, widget.lead.id), child: const Padding(padding: EdgeInsets.all(4), child: Icon(Icons.phone_outlined, color: Colors.blue, size: 20))),
+                    GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => _makeCall(context, displayContact, widget.lead.id), child: const Padding(padding: EdgeInsets.all(4), child: Icon(Icons.phone_outlined, color: Colors.blue, size: 20))),
                     const SizedBox(width: 4),
-                    GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => _sendWhatsApp(context, widget.lead.contact, widget.lead.id), child: Padding(padding: const EdgeInsets.only(right: 12, top: 4, bottom: 4, left: 4), child: Image.asset('Assets/img.png', height: 20, errorBuilder: (c, e, s) => const Icon(Icons.chat_bubble_outline_rounded, color: Colors.green, size: 20)))),
+                    GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => _sendWhatsApp(context, displayContact, widget.lead.id), child: Padding(padding: const EdgeInsets.only(right: 12, top: 4, bottom: 4, left: 4), child: Image.asset('Assets/img.png', height: 20, errorBuilder: (c, e, s) => const Icon(Icons.chat_bubble_outline_rounded, color: Colors.green, size: 20)))),
                   ],
                 ),
               ),
@@ -439,7 +440,10 @@ class _LeadTileState extends State<_LeadTile> {
   }
 
   Future<void> _makeCall(BuildContext context, String? number, String leadId) async {
-    if (number == null || number.isEmpty) return;
+    if (number == null || number.isEmpty || number.contains('•')) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🔒 This lead is private. Contact number is hidden.')));
+      return;
+    }
     final Uri url = Uri.parse('tel:$number');
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     if (await canLaunchUrl(url)) {
@@ -449,7 +453,10 @@ class _LeadTileState extends State<_LeadTile> {
   }
 
   Future<void> _sendWhatsApp(BuildContext context, String? number, String leadId) async {
-    if (number == null || number.isEmpty) return;
+    if (number == null || number.isEmpty || number.contains('•')) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🔒 This lead is private. Contact number is hidden.')));
+      return;
+    }
     String cleanNumber = number.replaceAll(RegExp(r'[^0-9]'), '');
     final Uri url = Uri.parse('https://wa.me/91$cleanNumber');
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
@@ -460,6 +467,8 @@ class _LeadTileState extends State<_LeadTile> {
   }
 
   Widget _buildClassicTile(BuildContext context) {
+    final authVM = Provider.of<AuthViewModel>(context);
+    final displayContact = widget.lead.getDisplayContact(authVM.userId, authVM.userName, authVM.appRole);
     final String firstLetter = widget.lead.fullName.trim().isEmpty ? '?' : widget.lead.fullName.trim()[0].toUpperCase();
     final String source = widget.lead.rawData['source']?.toString().trim() ?? '';
     final String caller = widget.lead.rawData['caller']?.toString().trim() ?? '';
@@ -477,7 +486,7 @@ class _LeadTileState extends State<_LeadTile> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min,
           children: [
-            Text(widget.lead.contact, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+            Text(displayContact, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.black87)),
             if (metaParts.isNotEmpty) ...[const SizedBox(height: 2), Text(metaParts.join(' • '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: Colors.grey.shade600))],
           ],
         ),

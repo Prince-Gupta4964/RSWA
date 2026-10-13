@@ -125,7 +125,17 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
     final associatedLeads = leadVM.leads.where((l) {
       final leadProjectName = (l.rawData['project'] ?? '').toString().trim().toLowerCase();
       final currentProjectName = project.projectName.trim().toLowerCase();
-      return leadProjectName == currentProjectName && leadProjectName.isNotEmpty;
+      if (leadProjectName != currentProjectName || leadProjectName.isEmpty) return false;
+
+      if (l.isPrivate) {
+        final String leadUserId = (l.rawData['userId'] ?? '').toString();
+        final String leadCreatedBy = (l.rawData['createdBy'] ?? '').toString();
+        final bool isCreator = (authVM.userId != null && authVM.userId!.isNotEmpty && leadUserId == authVM.userId) ||
+                               (authVM.userName.isNotEmpty && leadCreatedBy.toLowerCase() == authVM.userName.toLowerCase());
+        final bool isAdmin = authVM.appRole == AppRole.superAdmin || authVM.appRole == AppRole.admin;
+        if (!isCreator && !isAdmin) return false;
+      }
+      return true;
     }).toList();
 
     return PopScope<Object?>(
