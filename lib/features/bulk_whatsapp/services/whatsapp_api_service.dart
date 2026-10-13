@@ -36,6 +36,11 @@ class WhatsAppApiService {
       final formattedNumber = _formatPhoneNumber(phoneNumber);
       if (formattedNumber.isEmpty) return false;
 
+      // If buttons are present, ensure type is 'buttons'
+      if (buttons != null && buttons.isNotEmpty && type != 'buttons') {
+        type = 'buttons';
+      }
+
       // Handle custom rich templates with POST request
       if (type == 'buttons' && buttons != null && buttons.isNotEmpty) {
         final uri = Uri.parse(_baseUrl);
@@ -45,7 +50,9 @@ class WhatsAppApiService {
           final text = b['text']?.toString() ?? '';
           final url = b['url']?.toString() ?? b['link']?.toString() ?? '';
           final phone = b['phone']?.toString() ?? '';
+          final btnType = b['type']?.toString() ?? (url.isNotEmpty ? 'url' : (phone.isNotEmpty ? 'phone' : 'text'));
 
+          newB['type'] = btnType;
           newB['text'] = text;
           if (url.isNotEmpty) {
             newB['url'] = url;
