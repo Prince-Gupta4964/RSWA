@@ -182,13 +182,6 @@ class _AddLeadViewState extends State<AddLeadView> {
     }
   }
 
-  void _onFieldChanged(String id, String val) {
-    _formData[id] = val;
-    if (id == 'referralName1') {
-      _updateMultiLevelReferrals(val);
-    }
-  }
-
   void _setupCalculations() {
     void calculate() {
       final flatCost = double.tryParse(_controllers['flatCost']?.text.replaceAll(',', '') ?? '') ?? 0.0;
