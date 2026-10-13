@@ -325,6 +325,15 @@ class AuthViewModel extends ChangeNotifier {
     try {
       debugPrint('AUTH: Starting login for email: [$email]');
       
+      // Ensure authenticated context for Firestore queries if rules require auth != null
+      if (_auth.currentUser == null) {
+        try {
+          await _auth.signInAnonymously().timeout(const Duration(seconds: 5));
+        } catch (e) {
+          debugPrint('AUTH: Anonymous auth warning: $e');
+        }
+      }
+
       final userDoc = await _findUserByEmail(rawEmail, email);
       
       if (userDoc == null) {
