@@ -310,7 +310,11 @@ class AppConfigurationViewModel extends ChangeNotifier {
             final id = newSub['id']?.toString();
             if (id != null && overrideMap.containsKey(id)) {
               final override = overrideMap[id]!;
-              if (override['label'] != null) newSub['label'] = override['label'];
+              if (id != 'propertyType' && override['label'] != null) {
+                newSub['label'] = override['label'];
+              } else if (id == 'propertyType') {
+                newSub['label'] = 'Property Type';
+              }
               if (override['isVisible'] != null) newSub['isVisible'] = override['isVisible'];
               if (override['initialValue'] != null && override['initialValue'].toString().isNotEmpty) {
                 newSub['initialValue'] = override['initialValue'];
@@ -337,7 +341,11 @@ class AppConfigurationViewModel extends ChangeNotifier {
           final id = newField['id']?.toString();
           if (id != null && overrideMap.containsKey(id)) {
             final override = overrideMap[id]!;
-            if (override['label'] != null) newField['label'] = override['label'];
+            if (id != 'propertyType' && override['label'] != null) {
+              newField['label'] = override['label'];
+            } else if (id == 'propertyType') {
+              newField['label'] = 'Property Type';
+            }
             if (override['isVisible'] != null) newField['isVisible'] = override['isVisible'];
             if (override['initialValue'] != null && override['initialValue'].toString().isNotEmpty) {
               newField['initialValue'] = override['initialValue'];
