@@ -439,12 +439,26 @@ class _AddLeadViewState extends State<AddLeadView> {
 
     if (config.containsKey('visibleIf')) {
       final String visibleIf = config['visibleIf'];
-      if (visibleIf.contains(' == ')) {
+      if (visibleIf.contains(' || ')) {
+        final conditions = visibleIf.split(' || ');
+        bool matched = false;
+        for (var cond in conditions) {
+          cond = cond.trim();
+          if (cond.contains(' == ')) {
+            final parts = cond.split(' == ');
+            if (_formData[parts[0].trim()] == parts[1].trim()) matched = true;
+          } else if (cond.contains(' != ')) {
+            final parts = cond.split(' != ');
+            if (_formData[parts[0].trim()] != parts[1].trim()) matched = true;
+          }
+        }
+        if (!matched) return false;
+      } else if (visibleIf.contains(' == ')) {
         final parts = visibleIf.split(' == ');
-        if (_formData[parts[0]] != parts[1]) return false;
+        if (_formData[parts[0].trim()] != parts[1].trim()) return false;
       } else if (visibleIf.contains(' != ')) {
         final parts = visibleIf.split(' != ');
-        if (_formData[parts[0]] == parts[1]) return false;
+        if (_formData[parts[0].trim()] == parts[1].trim()) return false;
       }
     }
 
