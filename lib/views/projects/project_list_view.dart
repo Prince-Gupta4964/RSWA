@@ -1032,7 +1032,14 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                           }
 
                           if (_searchQuery.isNotEmpty) {
-                            if (!project.projectName.toLowerCase().contains(_searchQuery.toLowerCase())) return false;
+                            final query = _searchQuery.toLowerCase();
+                            final nameMatch = project.projectName.toLowerCase().contains(query);
+                            final locMatch = project.displayLocation.toLowerCase().contains(query);
+                            final addressMatch = (project.propertyDetails['address'] ?? project.rawData['address'] ?? '').toString().toLowerCase().contains(query);
+                            final cityMatch = (project.propertyDetails['city'] ?? project.rawData['city'] ?? '').toString().toLowerCase().contains(query);
+                            final areaMatch = (project.propertyDetails['areaName'] ?? project.rawData['areaName'] ?? '').toString().toLowerCase().contains(query);
+
+                            if (!nameMatch && !locMatch && !addressMatch && !cityMatch && !areaMatch) return false;
                           }
 
                           // 🚀 NAYA: "My Projects", "Pending", and "Fav Projects" tabs should ignore category/type/city filters
