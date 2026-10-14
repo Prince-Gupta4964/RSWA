@@ -99,7 +99,7 @@ class PrivacyPolicyView extends StatelessWidget {
 
             _SectionTitle(title: '8. Contact Us'),
             Text(
-              'If you have questions or comments about this Privacy Policy, please contact us at:\n\nEmail: support@propertyplus.com',
+              'If you have questions or comments about this Privacy Policy, please contact us at:\n\nEmail: atechitcompany@gmail.com',
               style: TextStyle(fontSize: 14, height: 1.5, color: Colors.black87),
             ),
             SizedBox(height: 48),
