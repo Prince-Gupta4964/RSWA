@@ -5,6 +5,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 import 'routes/app_router.dart';
 import 'firebase_options.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'viewmodels/lead_viewmodel.dart';
 import 'viewmodels/cp_viewmodel.dart';
 import 'viewmodels/project_viewmodel.dart';
@@ -38,6 +39,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy(); // 🚀 Enable clean path URLs on Web (e.g. /privacy-policy without hash)
 
   try {
     debugPrint("AUTH: Initializing Firebase...");

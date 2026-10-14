@@ -1033,13 +1033,22 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
 
                           if (_searchQuery.isNotEmpty) {
                             final query = _searchQuery.toLowerCase();
-                            final nameMatch = project.projectName.toLowerCase().contains(query);
-                            final locMatch = project.displayLocation.toLowerCase().contains(query);
-                            final addressMatch = (project.propertyDetails['address'] ?? project.rawData['address'] ?? '').toString().toLowerCase().contains(query);
-                            final cityMatch = (project.propertyDetails['city'] ?? project.rawData['city'] ?? '').toString().toLowerCase().contains(query);
-                            final areaMatch = (project.propertyDetails['areaName'] ?? project.rawData['areaName'] ?? '').toString().toLowerCase().contains(query);
+                            bool matches = project.projectName.toLowerCase().contains(query) ||
+                                           project.displayLocation.toLowerCase().contains(query);
+                            
+                            if (!matches) {
+                              matches = project.propertyDetails.values.any((v) => v != null && v.toString().toLowerCase().contains(query));
+                            }
+                            if (!matches) {
+                              matches = project.rawData.values.any((v) {
+                                if (v is Map) {
+                                  return v.values.any((subV) => subV != null && subV.toString().toLowerCase().contains(query));
+                                }
+                                return v != null && v.toString().toLowerCase().contains(query);
+                              });
+                            }
 
-                            if (!nameMatch && !locMatch && !addressMatch && !cityMatch && !areaMatch) return false;
+                            if (!matches) return false;
                           }
 
                           // 🚀 NAYA: "My Projects", "Pending", and "Fav Projects" tabs should ignore category/type/city filters
