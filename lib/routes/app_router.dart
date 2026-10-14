@@ -14,6 +14,7 @@ import '../viewmodels/cp_viewmodel.dart';
 import '../viewmodels/project_viewmodel.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../views/auth/login_view.dart';
+import '../views/auth/privacy_policy_view.dart'; // 🚀 NAYA
 import '../views/auth/customer_form_view.dart';
 import '../views/dashboard/dashboard_view.dart';
 import '../views/admin/admin_console_view.dart';
@@ -63,6 +64,11 @@ class AppRouter {
           final String? mode = state.uri.queryParameters['mode'];
           return NoTransitionPage(child: LoginView(initialReferralCode: referralCode, mode: mode));
         },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/privacy-policy', // 🚀 NAYA Route
+        pageBuilder: (context, state) => const NoTransitionPage(child: PrivacyPolicyView()),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

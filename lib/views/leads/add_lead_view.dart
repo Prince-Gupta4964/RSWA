@@ -14,7 +14,6 @@ import '../../viewmodels/cp_viewmodel.dart';
 import '../../viewmodels/project_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/app_configuration_viewmodel.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../features/bulk_whatsapp/services/whatsapp_api_service.dart';
 import '../../models/lead_model.dart';
 import '../../models/cp_model.dart';
@@ -999,28 +998,34 @@ class _AddLeadViewState extends State<AddLeadView> {
                           },
                         )
                       : null,
-                    suffixIcon: (id == 'whatsapp' || id == 'contact2') 
-                      ? IconButton(
-                          icon: const Icon(Icons.contacts_rounded, color: Color(0xFFFF6B22)),
-                          onPressed: () => _pickNumberFromContacts(id),
-                        )
-                      : (finalOptions.isNotEmpty ? IconButton(
-                          icon: Icon(isListOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down, color: Colors.grey),
-                          onPressed: () {
-                            setState(() {
-                              if (isListOpen) {
-                                _openDropdowns[id] = false;
-                                FocusScope.of(context).unfocus();
-                              } else {
-                                _openDropdowns[id] = true;
-                                fNode.requestFocus();
-                                final currentText = textCtrl.text;
-                                textCtrl.text = '$currentText ';
-                                textCtrl.text = currentText;
-                              }
-                            });
-                          },
-                        ) : null),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (id == 'whatsapp' || id == 'contact2')
+                          IconButton(
+                            icon: const Icon(Icons.contacts_rounded, color: Color(0xFFFF6B22)),
+                            onPressed: () => _pickNumberFromContacts(id),
+                          ),
+                        if (finalOptions.isNotEmpty)
+                          IconButton(
+                            icon: Icon(isListOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down, color: Colors.grey),
+                            onPressed: () {
+                              setState(() {
+                                if (isListOpen) {
+                                  _openDropdowns[id] = false;
+                                  FocusScope.of(context).unfocus();
+                                } else {
+                                  _openDropdowns[id] = true;
+                                  fNode.requestFocus();
+                                  final currentText = textCtrl.text;
+                                  textCtrl.text = '$currentText ';
+                                  textCtrl.text = currentText;
+                                }
+                              });
+                            },
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -1072,16 +1077,30 @@ class _AddLeadViewState extends State<AddLeadView> {
       },
     );
 
-    if (id == 'whatsapp' && !_showContact2) {
+    if (id == 'whatsapp') {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(child: fieldWidget),
           const SizedBox(width: 8),
           IconButton(
-            icon: const Icon(Icons.add_circle, size: 24, color: Color(0xFFFF6B22)),
-            onPressed: () => setState(() => _showContact2 = true),
-            tooltip: 'Add Contact 2',
+            icon: Icon(
+              _showContact2 ? Icons.remove_circle : Icons.add_circle,
+              size: 24,
+              color: _showContact2 ? Colors.redAccent : const Color(0xFFFF6B22),
+            ),
+            onPressed: () {
+              setState(() {
+                if (_showContact2) {
+                  _showContact2 = false;
+                  _formData['contact2'] = '';
+                  _controllers['contact2']?.clear();
+                } else {
+                  _showContact2 = true;
+                }
+              });
+            },
+            tooltip: _showContact2 ? 'Remove Contact 2' : 'Add Contact 2',
           ),
         ],
       );
@@ -1447,7 +1466,7 @@ class _AddLeadViewState extends State<AddLeadView> {
         actorMetadata: authVM.actorMetadata,
       );
 
-      // Send Project Details via WhatsApp (Hybrid: url_launcher on Web, Deropo API on APK)
+      // Send Project Details via WhatsApp API if enabled
       final sendDetailsVal = _formData['sendProjectDetails'];
       final bool sendDetails = sendDetailsVal == true || sendDetailsVal == 'Yes';
       if (sendDetails) {

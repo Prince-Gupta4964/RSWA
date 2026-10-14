@@ -369,6 +369,25 @@ class _LoginViewState extends State<LoginView> {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
                 ),
+                
+                // 🚀 NAYA: Privacy Policy Link
+                const SizedBox(height: 12),
+                Center(
+                  child: TextButton(
+                    onPressed: () => context.push('/privacy-policy'),
+                    child: Text(
+                      'Privacy Policy',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: _primaryDark,
+                        decoration: TextDecoration.underline,
+                        decorationColor: _primaryDark,
+                      ),
+                    ),
+                  ),
+                ),
+                
                 const SizedBox(height: 24),
               ],
             ),

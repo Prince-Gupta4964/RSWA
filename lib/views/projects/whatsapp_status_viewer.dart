@@ -364,72 +364,6 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
     });
   }
 
-  void _showViewsSheet(BuildContext context) {
-    setState(() => _isPaused = true);
-    _animController.stop();
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('projects').doc(widget.projectId).snapshots(),
-        builder: (context, snapshot) {
-          Map<String, dynamic> statusViews = {};
-          Map<String, dynamic> statusViewNames = {};
-          if (snapshot.hasData && snapshot.data!.exists) {
-            final d = snapshot.data!.data() as Map<String, dynamic>?;
-            final rawViews = d?['statusViews'] ?? d?['propertyDetails']?['statusViews'];
-            if (rawViews is Map) statusViews = Map<String, dynamic>.from(rawViews);
-            final rawNames = d?['statusViewNames'] ?? d?['propertyDetails']?['statusViewNames'];
-            if (rawNames is Map) statusViewNames = Map<String, dynamic>.from(rawNames);
-          }
-
-          final entries = statusViews.entries.toList();
-
-          return Container(
-            padding: const EdgeInsets.all(20),
-            constraints: const BoxConstraints(maxHeight: 400),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Status Views (${entries.length} Viewers)', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const Divider(),
-                Expanded(
-                  child: entries.isEmpty
-                      ? const Center(child: Text('No views yet', style: TextStyle(color: Colors.grey)))
-                      : ListView.builder(
-                          itemCount: entries.length,
-                          itemBuilder: (context, index) {
-                            final entry = entries[index];
-                            final uid = entry.key;
-                            final count = entry.value;
-                            final name = statusViewNames[uid] ?? 'User';
-                            return ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: const Color(0xFFFF6B22),
-                                child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'U', style: const TextStyle(color: Colors.white)),
-                              ),
-                              title: Text('$name ($count)', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    ).whenComplete(() {
-      if (mounted) {
-        setState(() => _isPaused = false);
-        if (!(_currentIndex == 0 && _hasVideo)) {
-          _animController.forward();
-        }
-      }
-    });
-  }
-
   void _shareProject() {
     final String shareText = 'Check out this amazing property: ${widget.projectName} at ${widget.location}!';
     Share.share(shareText);
@@ -670,23 +604,20 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
                               if (val is num) totalViews += val.toInt();
                             }
 
-                            return InkWell(
-                              onTap: () => _showViewsSheet(context),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const CircleAvatar(
-                                    radius: 24,
-                                    backgroundColor: Colors.white24,
-                                    child: Icon(Icons.remove_red_eye_rounded, color: Colors.white, size: 26),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    '$totalViews Views',
-                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: Colors.white24,
+                                  child: Icon(Icons.remove_red_eye_rounded, color: Colors.white, size: 26),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '$totalViews Views',
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ],
                             );
                           },
                         ),

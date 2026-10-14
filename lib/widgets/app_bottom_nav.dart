@@ -69,7 +69,7 @@ class _AppBottomNavState extends State<AppBottomNav> {
       ),
       _NavItem(
         keyName: 'cp',
-        label: 'CP',
+        label: 'PP', // 🚀 NAYA: CP changed to PP
         icon: Icons.people_rounded,
         branchIndex: 2,
       ),
