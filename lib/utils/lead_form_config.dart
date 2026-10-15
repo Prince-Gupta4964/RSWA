@@ -125,13 +125,7 @@ class LeadFormStrings {
       "title": sectionBasicInfo,
       "fields": [
         {"id": "timestamp", "label": labelDateTime, "type": "text", "readOnly": true},
-        {
-          "type": "row",
-          "fields": [
-            {"id": "company", "label": labelCompany, "type": "dropdown", "options": ["Insight", "Partner"]},
-            {"id": "project", "label": labelProject, "type": "project_dropdown"},
-          ]
-        },
+        {"id": "project", "label": labelProject, "type": "project_dropdown"},
         {
           "type": "row",
           "fields": [
