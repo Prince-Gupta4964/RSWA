@@ -48,6 +48,7 @@ class _AddLeadViewState extends State<AddLeadView> {
   final Map<String, bool> _openDropdowns = {}; 
   final List<String> _flatFields = [];
   String? _currentFocusedId;
+  final FocusScopeNode _formFocusScopeNode = FocusScopeNode();
   final ScrollController _scrollController = ScrollController();
   final Map<String, GlobalKey> _sectionKeys = {}; 
 
@@ -258,6 +259,7 @@ class _AddLeadViewState extends State<AddLeadView> {
 
   @override
   void dispose() {
+    _formFocusScopeNode.dispose();
     for (var controller in _controllers.values) {
       controller.dispose();
     }
@@ -631,19 +633,22 @@ class _AddLeadViewState extends State<AddLeadView> {
             style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
           ),
         ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              controller: _scrollController,
-              padding: const EdgeInsets.only(bottom: 20),
-              children: _formStructure.map<Widget>((section) {
-                return _buildSection(section);
-              }).toList(),
+      body: FocusScope(
+        node: _formFocusScopeNode,
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.only(bottom: 20),
+                children: _formStructure.map<Widget>((section) {
+                  return _buildSection(section);
+                }).toList(),
+              ),
             ),
-          ),
-          _buildStickyNavigation(isEditing),
-        ],
+            _buildStickyNavigation(isEditing),
+          ],
+        ),
       ),
     ));
   }
