@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/lead_model.dart';
 
-class FollowUpHistoryTile extends StatefulWidget {
+class FollowUpHistoryTile extends StatelessWidget {
   final LeadModel lead;
   final Map<String, dynamic> entry;
   final String docId;
@@ -17,133 +17,196 @@ class FollowUpHistoryTile extends StatefulWidget {
   });
 
   @override
-  State<FollowUpHistoryTile> createState() => _FollowUpHistoryTileState();
-}
-
-class _FollowUpHistoryTileState extends State<FollowUpHistoryTile> {
-  bool _isExpanded = false;
-
-  @override
   Widget build(BuildContext context) {
-    final timestamp = widget.entry['timestamp'] as Timestamp?;
+    final timestamp = entry['timestamp'] as Timestamp?;
     final String dateStr = timestamp != null
         ? DateFormat('dd/MM/yyyy').format(timestamp.toDate())
         : "Recently";
-    
-    final String workType = (widget.entry['workType'] ?? widget.entry['status'] ?? 'Work').toString();
-    final String firstLetter = workType.isNotEmpty ? workType[0].toUpperCase() : 'W';
-    final String status = (widget.entry['status']?.toString() ?? 'WARM').toUpperCase();
-    
-    const Color primaryColor = Color(0xFFFBE64E); 
-    const Color secondaryColor = Color(0xFF6B5800);
+    final String timeStr = timestamp != null
+        ? DateFormat('hh:mm a').format(timestamp.toDate())
+        : "--:--";
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: Colors.grey.shade200, width: 1.0),
-      ),
-      child: Column(
+    final String workType = (entry['workType'] ?? entry['status'] ?? 'Work').toString();
+    final lowerType = workType.toLowerCase();
+    
+    // Icon & Color mapping
+    IconData iconData = Icons.history_rounded;
+    Color iconColor = Colors.orange;
+    Color bgColor = Colors.orange.shade50;
+
+    if (lowerType.contains('call') || lowerType.contains('contact')) {
+      iconData = Icons.phone_rounded;
+      iconColor = Colors.orange;
+      bgColor = Colors.orange.shade50;
+    } else if (lowerType.contains('msg') || lowerType.contains('whatsapp') || lowerType.contains('message')) {
+      iconData = Icons.chat_bubble_rounded;
+      iconColor = Colors.green;
+      bgColor = Colors.green.shade50;
+    } else if (lowerType.contains('meet') || lowerType.contains('visit') || lowerType.contains('site')) {
+      iconData = Icons.groups_rounded;
+      iconColor = Colors.purple;
+      bgColor = Colors.purple.shade50;
+    } else if (lowerType.contains('journey') || lowerType.contains('stage')) {
+      iconData = Icons.swap_horiz_rounded;
+      iconColor = Colors.amber.shade800;
+      bgColor = Colors.amber.shade50;
+    } else if (lowerType.contains('created') || lowerType.contains('lead')) {
+      iconData = Icons.add_rounded;
+      iconColor = Colors.pink;
+      bgColor = Colors.pink.shade50;
+    }
+
+    final int dayCount = _calculateFollowUpDay(timestamp);
+    final String remark = (entry['remark'] ?? entry['notes'] ?? '').toString();
+    final String title = _formatTitle(workType);
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GestureDetector(
-            onTap: () => setState(() => _isExpanded = !_isExpanded),
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-              child: Row(
+          // Left Timeline Avatar & Line
+          Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(iconData, color: iconColor, size: 20),
+              ),
+              Expanded(
+                child: Container(
+                  width: 2,
+                  color: Colors.grey.shade200,
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 12),
+
+          // Right Content Card
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200, width: 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 20.0,
-                    backgroundColor: primaryColor,
-                    child: Text(firstLetter, style: const TextStyle(color: secondaryColor, fontWeight: FontWeight.bold, fontSize: 16.0)),
-                  ),
-                  const SizedBox(width: 12.0),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(dateStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.0, color: Colors.black87)),
-                        const SizedBox(height: 2.0),
-                        Text(
-                          (widget.entry['remark'] ?? '').toString(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.grey.shade500, fontSize: 12.0),
+                  // Top Row: Date, Day Pill, Time, 3-dots
+                  Row(
+                    children: [
+                      Text(dateStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD54F).withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ],
-                    ),
+                        child: Text(
+                          'Day $dayCount',
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.brown),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(timeStr, style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
+                      const SizedBox(width: 4),
+                      PopupMenuButton<String>(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(Icons.more_vert_rounded, size: 18, color: Colors.grey.shade400),
+                        onSelected: (val) {
+                          if (val == 'edit') {
+                            context.push('/add-task', extra: {'lead': lead, 'followupData': entry, 'followupId': docId});
+                          } else if (val == 'info') {
+                            context.push('/task-detail', extra: {'lead': lead, 'followupId': docId, 'data': entry});
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(value: 'edit', child: Text('Edit Entry')),
+                          const PopupMenuItem(value: 'info', child: Text('View Details')),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8.0),
-                  Container(
-                    width: 70.0,
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(vertical: 4.0),
-                    decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20.0),
-                      border: Border.all(color: primaryColor, width: 1.2),
-                    ),
-                    child: Text(status, style: const TextStyle(color: secondaryColor, fontSize: 9.0, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                  const SizedBox(height: 6),
+
+                  // Title / Action Type
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
                   ),
+                  const SizedBox(height: 4),
+
+                  // Description / Remark
+                  if (remark.isNotEmpty)
+                    Text(
+                      remark,
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.3),
+                    ),
+
+                  // Special Stage Changed Card if present
+                  if (entry['journeyStage'] != null || entry['stage'] != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFAED),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.amber.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.orange),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Stage changed to ${entry['journeyStage'] ?? entry['stage']}',
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Colors.brown),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
-          if (_isExpanded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12.0, 0.0, 12.0, 12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Divider(height: 1.0),
-                  const SizedBox(height: 8.0),
-                  _detailItem('Recorded By', (widget.entry['caller'] ?? 'Unknown').toString()),
-                  _detailItem('Assignee', (widget.entry['assign'] ?? 'N/A').toString()),
-                  _detailItem('Time', '${(widget.entry['startTime'] ?? '--').toString()} to ${(widget.entry['endTime'] ?? '--').toString()}'),
-                  const SizedBox(height: 8.0),
-                  const Text('Remark:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.0, color: Colors.black54)),
-                  const SizedBox(height: 4.0),
-                  Text((widget.entry['remark'] ?? 'No remark.').toString(), style: const TextStyle(fontSize: 13.0, color: Colors.black87, height: 1.4)),
-                  const SizedBox(height: 16.0),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _circleBtn(Icons.edit_outlined, Colors.blue, () {
-                        context.push('/add-task', extra: {'lead': widget.lead, 'followupData': widget.entry, 'followupId': widget.docId});
-                      }),
-                      const SizedBox(width: 12.0),
-                      _circleBtn(Icons.info_outline, const Color(0xFFFF6B22), () {
-                        context.push('/task-detail', extra: {'lead': widget.lead, 'followupId': widget.docId, 'data': widget.entry});
-                      }),
-                    ],
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
   }
 
-  Widget _detailItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4.0),
-      child: Row(children: [
-        Text('$label: ', style: const TextStyle(fontSize: 12.0, fontWeight: FontWeight.bold, color: Colors.black54)),
-        Text(value, style: const TextStyle(fontSize: 12.0, color: Colors.black87)),
-      ]),
-    );
+  int _calculateFollowUpDay(Timestamp? entryTimestamp) {
+    final createdAt = lead.rawData['createdAt'];
+    if (createdAt is Timestamp && entryTimestamp != null) {
+      final diff = entryTimestamp.toDate().difference(createdAt.toDate()).inDays;
+      return diff >= 0 ? diff + 1 : 1;
+    }
+    return 1;
   }
 
-  Widget _circleBtn(IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(8.0),
-        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white, border: Border.all(color: Colors.grey.shade200, width: 1.0)),
-        child: Icon(icon, color: color, size: 20.0),
-      ),
-    );
+  String _formatTitle(String raw) {
+    final l = raw.toLowerCase();
+    if (l.contains('call') || l.contains('contact')) return 'Call';
+    if (l.contains('msg') || l.contains('whatsapp') || l.contains('message')) return 'Msg';
+    if (l.contains('meet') || l.contains('visit') || l.contains('site')) return 'Meet';
+    if (l.contains('journey') || l.contains('stage')) return 'Journey update';
+    if (l.contains('created') || l.contains('lead')) return 'Lead Created';
+    return raw[0].toUpperCase() + raw.substring(1);
   }
 }
