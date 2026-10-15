@@ -191,10 +191,21 @@ class FollowUpHistoryTile extends StatelessWidget {
     );
   }
 
+  DateTime? _getLeadCreationDate() {
+    final raw = lead.rawData['createdAt'] ?? lead.rawData['timestamp'] ?? lead.rawData['date'];
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw);
+    return null;
+  }
+
   int _calculateFollowUpDay(Timestamp? entryTimestamp) {
-    final createdAt = lead.rawData['createdAt'];
-    if (createdAt is Timestamp && entryTimestamp != null) {
-      final diff = entryTimestamp.toDate().difference(createdAt.toDate()).inDays;
+    final createdDt = _getLeadCreationDate();
+    final entryDt = entryTimestamp?.toDate();
+    if (createdDt != null && entryDt != null) {
+      final diff = DateTime(entryDt.year, entryDt.month, entryDt.day)
+          .difference(DateTime(createdDt.year, createdDt.month, createdDt.day))
+          .inDays;
       return diff >= 0 ? diff + 1 : 1;
     }
     return 1;

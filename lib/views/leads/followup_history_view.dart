@@ -78,26 +78,13 @@ class _FollowUpHistoryViewState extends State<FollowUpHistoryView> {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: ['All', 'Call', 'Msg', 'Meets', 'Others'].map((filter) {
-                    final bool isSelected = _selectedFilter == filter;
-                    return Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(filter),
-                        selected: isSelected,
-                        selectedColor: const Color(0xFFFFD54F),
-                        backgroundColor: Colors.grey.shade200,
-                        labelStyle: TextStyle(
-                          color: isSelected ? Colors.black87 : Colors.grey.shade700,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          fontSize: 13,
-                        ),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        showCheckmark: false,
-                        onSelected: (_) => setState(() => _selectedFilter = filter),
-                      ),
-                    );
-                  }).toList(),
+                  children: [
+                    _filterChip('All', Icons.all_inclusive),
+                    _filterChip('Call', Icons.phone_rounded),
+                    _filterChip('Msg', Icons.chat_bubble_rounded),
+                    _filterChip('Meets', Icons.groups_rounded),
+                    _filterChip('Others', Icons.assignment_rounded),
+                  ],
                 ),
               ),
             ),
@@ -115,6 +102,19 @@ class _FollowUpHistoryViewState extends State<FollowUpHistoryView> {
                   }
 
                   final docs = snapshot.data!.docs;
+
+                  // --- Stats Calculation ---
+                  int totalCalls = 0;
+                  int totalWa = 0;
+                  int totalMeetings = 0;
+
+                  for (var doc in docs) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final type = (data['workType'] ?? data['status'] ?? '').toString().toLowerCase();
+                    if (type.contains('call') || type.contains('contact')) totalCalls++;
+                    if (type.contains('msg') || type.contains('whatsapp') || type.contains('message')) totalWa++;
+                    if (type.contains('meet') || type.contains('visit') || type.contains('site')) totalMeetings++;
+                  }
 
                   // --- Filter Logic ---
                   final filteredDocs = docs.where((doc) {
@@ -138,7 +138,7 @@ class _FollowUpHistoryViewState extends State<FollowUpHistoryView> {
                   return ListView(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     children: [
-                      // Lead Age & Followups Summary Card
+                      // Lead Age & Stats Summary Card
                       Container(
                         padding: const EdgeInsets.all(16),
                         margin: const EdgeInsets.only(bottom: 16),
@@ -147,35 +147,29 @@ class _FollowUpHistoryViewState extends State<FollowUpHistoryView> {
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: Colors.amber.shade200, width: 1),
                         ),
-                        child: Row(
+                        child: Column(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade300,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.calendar_today_rounded, color: Colors.brown, size: 22),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Lead age', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                                const SizedBox(height: 2),
-                                Text('$leadAge days', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                const Text('since lead was created', style: TextStyle(color: Colors.grey, fontSize: 10)),
-                              ],
-                            ),
-                            const Spacer(),
-                            Container(
-                              height: 36,
-                              width: 1,
-                              color: Colors.amber.shade300,
-                            ),
-                            const Spacer(),
                             Row(
                               children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.shade300,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(Icons.calendar_today_rounded, color: Colors.brown, size: 22),
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Lead age', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                    const SizedBox(height: 2),
+                                    Text('$leadAge days', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                    const Text('since lead was created', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                                  ],
+                                ),
+                                const Spacer(),
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
@@ -192,6 +186,17 @@ class _FollowUpHistoryViewState extends State<FollowUpHistoryView> {
                                     const Text('Follow-ups', style: TextStyle(color: Colors.grey, fontSize: 11)),
                                   ],
                                 ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            const Divider(height: 1),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _statPill(Icons.phone_rounded, '$totalCalls Calls', Colors.blue.shade700, Colors.blue.shade50),
+                                _statPill(Icons.chat_bubble_rounded, '$totalWa Msg', Colors.green.shade700, Colors.green.shade50),
+                                _statPill(Icons.groups_rounded, '$totalMeetings Meets', Colors.purple.shade700, Colors.purple.shade50),
                               ],
                             ),
                           ],
@@ -225,10 +230,58 @@ class _FollowUpHistoryViewState extends State<FollowUpHistoryView> {
     );
   }
 
+  Widget _filterChip(String label, IconData icon) {
+    final bool isSelected = _selectedFilter == label;
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        avatar: label == 'All' ? null : Icon(icon, size: 16, color: isSelected ? Colors.black : Colors.grey.shade700),
+        label: Text(label),
+        selected: isSelected,
+        selectedColor: const Color(0xFFFFD54F),
+        backgroundColor: Colors.grey.shade200,
+        labelStyle: TextStyle(
+          color: isSelected ? Colors.black87 : Colors.grey.shade700,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          fontSize: 13,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        showCheckmark: false,
+        onSelected: (_) => setState(() => _selectedFilter = label),
+      ),
+    );
+  }
+
+  Widget _statPill(IconData icon, String label, Color textColor, Color bgColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: textColor),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  DateTime? _getLeadCreationDate() {
+    final raw = widget.lead.rawData['createdAt'] ?? widget.lead.rawData['timestamp'] ?? widget.lead.rawData['date'];
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw);
+    return null;
+  }
+
   int _calculateLeadAge() {
-    final createdAt = widget.lead.rawData['createdAt'];
-    if (createdAt is Timestamp) {
-      final diff = DateTime.now().difference(createdAt.toDate()).inDays;
+    final createdDt = _getLeadCreationDate();
+    if (createdDt != null) {
+      final diff = DateTime.now().difference(createdDt).inDays;
       return diff >= 0 ? diff + 1 : 1;
     }
     return 1;
