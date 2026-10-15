@@ -61,6 +61,7 @@ class _AddProjectViewState extends State<AddProjectView> {
   final List<String> _pendingBuilderNames = []; // 🚀 Staged new builder names
   final List<String> _flatFields = ['flatNo', 'buildingName', 'areaName', 'nearby', 'opposite', 'road'];
   final ScrollController _scrollController = ScrollController();
+  final FocusScopeNode _formFocusScopeNode = FocusScopeNode();
   final Map<String, int> _activeChipIndex = {};
   final Map<String, GlobalKey> _sectionKeys = {}; // 🚀 NAYA
 
@@ -259,6 +260,7 @@ class _AddProjectViewState extends State<AddProjectView> {
 
   @override
   void dispose() {
+    _formFocusScopeNode.dispose();
     for (var ctrl in _controllers.values) ctrl.dispose();
     for (var node in _focusNodes.values) node.dispose();
     for (var row in _customAttachmentRows) {
@@ -713,17 +715,20 @@ class _AddProjectViewState extends State<AddProjectView> {
           leading: IconButton(onPressed: _navigateBackOnCancelOrSave, icon: const Icon(Icons.arrow_back, color: Colors.black)),
           title: Text(isEditing ? 'Edit Project' : 'New Project Form', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
         ),
-        body: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                controller: _scrollController,
-                padding: const EdgeInsets.only(bottom: 20),
-                children: _formStructure.map<Widget>((section) => _buildSection(section)).toList(),
+        body: FocusScope(
+          node: _formFocusScopeNode,
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(bottom: 20),
+                  children: _formStructure.map<Widget>((section) => _buildSection(section)).toList(),
+                ),
               ),
-            ),
-            _buildStickyNavigation(isEditing),
-          ],
+              _buildStickyNavigation(isEditing),
+            ],
+          ),
         ),
       ),
     );
@@ -1915,6 +1920,9 @@ class _AddProjectViewState extends State<AddProjectView> {
             textInputAction: TextInputAction.next,
             onSubmitted: (_) {
               onSub();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _focusNextField(isDoubleClick: true);
+              });
             },
             decoration: _outlinedDecoration(label, id),
           );

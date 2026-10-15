@@ -981,7 +981,7 @@ class _AddLeadViewState extends State<AddLeadView> {
                   onSubmitted: (_) {
                     optionSelected = false;
                     onFieldSubmitted();
-                    Future.delayed(const Duration(milliseconds: 50), () {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (!optionSelected) {
                         _focusNextField();
                       }
