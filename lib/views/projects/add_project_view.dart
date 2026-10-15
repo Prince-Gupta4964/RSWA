@@ -2256,14 +2256,14 @@ class _AddProjectViewState extends State<AddProjectView> {
                 textInputAction: TextInputAction.next,
                 maxLines: maxLines,
                 onTap: () {
-                  if (ctrl.text.isEmpty) {
+                  if (options.isNotEmpty && ctrl.text.isEmpty) {
                     setState(() => _openDropdowns[id] = true);
                     ctrl.text = ' ';
                     ctrl.text = '';
                   }
                 },
                 decoration: _outlinedDecoration(label, id).copyWith(
-                  suffixIcon: IconButton(
+                  suffixIcon: options.isNotEmpty ? IconButton(
                     icon: Icon(isOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down), 
                     onPressed: () {
                       setState(() {
@@ -2276,7 +2276,7 @@ class _AddProjectViewState extends State<AddProjectView> {
                         ctrl.text = currentText;
                       }
                     }
-                  ),
+                  ) : null,
                 ),
                 onChanged: (v) {
                   _formData[id] = v;

@@ -973,7 +973,7 @@ class _AddLeadViewState extends State<AddLeadView> {
                     _onFieldChanged(id, val);
                   },
                   onTap: () {
-                    if (textCtrl.text.isEmpty) {
+                    if (finalOptions.isNotEmpty && textCtrl.text.isEmpty) {
                       textCtrl.text = ' ';
                       textCtrl.text = '';
                     }
