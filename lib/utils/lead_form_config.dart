@@ -195,7 +195,6 @@ class LeadFormStrings {
     {
       "title": sectionOtherDetails,
       "fields": [
-        {"id": "selectCompany", "label": "Select Company", "type": "dropdown", "options": ["Insight", "Partner"]},
         {"id": "majorProblem", "label": labelMajorProblem, "type": "autocomplete", "options": majorProblemsList},
         {"id": "majorRequirements", "label": labelMajorRequirements, "type": "multiline"},
         {"id": "preferredLocations", "label": labelPreferredLocations, "type": "text"},
