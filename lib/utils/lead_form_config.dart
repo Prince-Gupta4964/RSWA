@@ -160,7 +160,7 @@ class LeadFormStrings {
         {"id": "propertyType", "label": labelPropertyType, "type": "chips", "options": ["Flat", "Bungalow", "Land", "Others"]},
         {"id": "configuration", "label": labelConfiguration, "type": "chips", "options": ["1BHK", "2BHK", "3BHK", "4BHK", "Others"], "visibleIf": "propertyType == Flat || propertyType == Bungalow"},
         {"id": "status", "label": labelLeadStatus, "type": "chips", "dynamicStatus": true},
-        {"id": "isPrivate", "label": labelIsPrivate, "type": "switch", "initialValue": true},
+        {"id": "isPrivate", "label": labelIsPrivate, "type": "switch", "initialValue": false},
         {"id": "sendProjectDetails", "label": labelSendProjectDetails, "type": "switch", "initialValue": false},
       ]
     },

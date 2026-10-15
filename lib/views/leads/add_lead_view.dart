@@ -990,14 +990,37 @@ class _AddLeadViewState extends State<AddLeadView> {
                   decoration: _outlinedDecoration(label, id).copyWith(
                     prefixIcon: id == 'whatsapp'
                       ? IconButton(
-                          icon: Icon(
-                            (_formData['isPrivate'] ?? true) ? Icons.lock : Icons.lock_open,
-                            color: (_formData['isPrivate'] ?? true) ? const Color(0xFFFF6B22) : Colors.grey,
-                            size: 20,
+                          icon: Builder(
+                            builder: (context) {
+                              final bool isPrivate = _formData['isPrivate'] ?? false;
+                              return Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Icon(
+                                    isPrivate ? Icons.lock : Icons.lock_open,
+                                    color: isPrivate ? const Color(0xFFFF6B22) : Colors.grey,
+                                    size: 20,
+                                  ),
+                                  if (isPrivate)
+                                    const Positioned(
+                                      top: -4,
+                                      right: -4,
+                                      child: Text(
+                                        '*',
+                                        style: TextStyle(
+                                          color: Colors.red,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
                           ),
                           onPressed: () {
                             setState(() {
-                              bool current = _formData['isPrivate'] ?? true;
+                              bool current = _formData['isPrivate'] ?? false;
                               _formData['isPrivate'] = !current;
                             });
                           },
