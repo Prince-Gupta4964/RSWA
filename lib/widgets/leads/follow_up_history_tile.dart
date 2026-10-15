@@ -36,24 +36,24 @@ class FollowUpHistoryTile extends StatelessWidget {
 
     if (lowerType.contains('call') || lowerType.contains('contact')) {
       iconData = Icons.phone_rounded;
-      iconColor = Colors.orange;
-      bgColor = Colors.orange.shade50;
+      iconColor = Colors.orange.shade800;
+      bgColor = Colors.amber.shade100;
     } else if (lowerType.contains('msg') || lowerType.contains('whatsapp') || lowerType.contains('message')) {
       iconData = Icons.chat_bubble_rounded;
-      iconColor = Colors.green;
-      bgColor = Colors.green.shade50;
+      iconColor = Colors.green.shade700;
+      bgColor = Colors.green.shade100;
     } else if (lowerType.contains('meet') || lowerType.contains('visit') || lowerType.contains('site')) {
       iconData = Icons.groups_rounded;
-      iconColor = Colors.purple;
-      bgColor = Colors.purple.shade50;
+      iconColor = Colors.indigo.shade400;
+      bgColor = Colors.purple.shade100;
     } else if (lowerType.contains('journey') || lowerType.contains('stage')) {
-      iconData = Icons.swap_horiz_rounded;
-      iconColor = Colors.amber.shade800;
-      bgColor = Colors.amber.shade50;
+      iconData = Icons.assignment_rounded;
+      iconColor = Colors.amber.shade900;
+      bgColor = Colors.amber.shade100;
     } else if (lowerType.contains('created') || lowerType.contains('lead')) {
       iconData = Icons.add_rounded;
-      iconColor = Colors.pink;
-      bgColor = Colors.pink.shade50;
+      iconColor = Colors.pink.shade600;
+      bgColor = Colors.pink.shade100;
     }
 
     final int dayCount = _calculateFollowUpDay(timestamp);
