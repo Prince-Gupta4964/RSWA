@@ -20,7 +20,7 @@ class FollowUpHistoryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final timestamp = entry['timestamp'] as Timestamp?;
     final String dateStr = timestamp != null
-        ? DateFormat('dd/MM/yyyy').format(timestamp.toDate())
+        ? DateFormat('EEE, dd MMM').format(timestamp.toDate())
         : "Recently";
     final String timeStr = timestamp != null
         ? DateFormat('hh:mm a').format(timestamp.toDate())
@@ -37,23 +37,23 @@ class FollowUpHistoryTile extends StatelessWidget {
     if (lowerType.contains('call') || lowerType.contains('contact')) {
       iconData = Icons.phone_rounded;
       iconColor = Colors.orange.shade800;
-      bgColor = Colors.amber.shade100;
+      bgColor = Colors.orange.shade50;
     } else if (lowerType.contains('msg') || lowerType.contains('whatsapp') || lowerType.contains('message')) {
       iconData = Icons.chat_bubble_rounded;
       iconColor = Colors.green.shade700;
-      bgColor = Colors.green.shade100;
+      bgColor = Colors.green.shade50;
     } else if (lowerType.contains('meet') || lowerType.contains('visit') || lowerType.contains('site')) {
       iconData = Icons.groups_rounded;
-      iconColor = Colors.indigo.shade400;
-      bgColor = Colors.purple.shade100;
+      iconColor = Colors.indigo.shade600;
+      bgColor = Colors.indigo.shade50;
     } else if (lowerType.contains('journey') || lowerType.contains('stage')) {
       iconData = Icons.assignment_rounded;
       iconColor = Colors.amber.shade900;
-      bgColor = Colors.amber.shade100;
+      bgColor = Colors.amber.shade50;
     } else if (lowerType.contains('created') || lowerType.contains('lead')) {
       iconData = Icons.add_rounded;
       iconColor = Colors.pink.shade600;
-      bgColor = Colors.pink.shade100;
+      bgColor = Colors.pink.shade50;
     }
 
     final int dayCount = _calculateFollowUpDay(timestamp);
@@ -62,7 +62,7 @@ class FollowUpHistoryTile extends StatelessWidget {
 
     return IntrinsicHeight(
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch, // 🚀 Fixed Render Error
         children: [
           // Left Timeline Avatar & Line
           Column(
@@ -78,7 +78,7 @@ class FollowUpHistoryTile extends StatelessWidget {
               Expanded(
                 child: Container(
                   width: 2,
-                  color: Colors.grey.shade200,
+                  color: Colors.grey.shade300,
                   margin: const EdgeInsets.symmetric(vertical: 4),
                 ),
               ),
@@ -106,11 +106,27 @@ class FollowUpHistoryTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top Row: Date, Day Pill, Time, 3-dots
+                  // Top Row: Action Pill, Date, Day Pill, Time, 3-dots
                   Row(
                     children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: bgColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          title,
+                          style: TextStyle(color: iconColor, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text('·', style: TextStyle(color: Colors.grey.shade400, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 6),
                       Text(dateStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
+                      Text('·', style: TextStyle(color: Colors.grey.shade400, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
@@ -142,14 +158,7 @@ class FollowUpHistoryTile extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-
-                  // Title / Action Type
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
-                  ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
 
                   // Description / Remark
                   if (remark.isNotEmpty)

@@ -46,7 +46,8 @@ import '../widgets/auth_guard.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_drawer.dart';
 import '../features/map_screen/screens/map_screen.dart';
-import '../features/map_screen/screens/task_detail_page.dart';
+import '../features/map_screen/viewmodels/map_screen_viewmodel.dart';
+import '../features/map_screen/viewmodels/add_task_viewmodel.dart';
 import '../features/map_screen/screens/assignee_tasks_view.dart';
 import '../features/map_screen/models/task.dart';
 
@@ -148,8 +149,21 @@ class AppRouter {
             routes: [
               GoRoute(
                 path: '/map',
-                pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: AuthGuard(child: MapScreen(title: 'MAP'))),
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: AuthGuard(
+                    child: MultiProvider(
+                      providers: [
+                        ChangeNotifierProvider<MapScreenViewModel>(
+                          create: (_) => MapScreenViewModel(),
+                        ),
+                        ChangeNotifierProvider<AddTaskViewModel>(
+                          create: (_) => AddTaskViewModel(),
+                        ),
+                      ],
+                      child: const MapScreen(title: 'MAP'),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

@@ -65,6 +65,7 @@ dependencies:
   path_provider: ^2.1.2 # 🚀 For saving PDF Reports
   image: ^4.1.0
   archive: ^3.3.2
+  printing: ^5.14.3
 
 dev_dependencies:
   flutter_test:

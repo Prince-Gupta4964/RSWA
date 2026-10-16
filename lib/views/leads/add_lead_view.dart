@@ -1106,28 +1106,35 @@ class _AddLeadViewState extends State<AddLeadView> {
 
     if (id == 'whatsapp') {
       return Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(child: fieldWidget),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: Icon(
-              _showContact2 ? Icons.remove_circle : Icons.add_circle,
-              size: 24,
-              color: _showContact2 ? Colors.redAccent : const Color(0xFFFF6B22),
+          const SizedBox(width: 12),
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  if (_showContact2) {
+                    _showContact2 = false;
+                    _formData['contact2'] = '';
+                    _controllers['contact2']?.clear();
+                  } else {
+                    _showContact2 = true;
+                  }
+                });
+              },
+              borderRadius: BorderRadius.circular(24),
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: _showContact2 ? Colors.redAccent : const Color(0xFFFF6B22),
+                child: Icon(
+                  _showContact2 ? Icons.remove : Icons.add,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
             ),
-            onPressed: () {
-              setState(() {
-                if (_showContact2) {
-                  _showContact2 = false;
-                  _formData['contact2'] = '';
-                  _controllers['contact2']?.clear();
-                } else {
-                  _showContact2 = true;
-                }
-              });
-            },
-            tooltip: _showContact2 ? 'Remove Contact 2' : 'Add Contact 2',
           ),
         ],
       );
