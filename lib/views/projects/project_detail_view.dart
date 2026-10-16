@@ -431,7 +431,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
 
     final String baseUrl = Uri.base.origin;
     final String encodedName = Uri.encodeComponent(widget.project.projectName);
-    final String shareLink = "$baseUrl/#/share/project/$encodedName";
+    final String shareLink = "$baseUrl/share/project/$encodedName";
 
     // 🚀 NAYA: Rich Share Message
     final String message = "Property+\n\n"

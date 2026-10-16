@@ -1972,7 +1972,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
 
     final String baseUrl = Uri.base.origin;
     final String encodedName = Uri.encodeComponent(project.projectName);
-    final String shareLink = "$baseUrl/#/share/project/$encodedName";
+    final String shareLink = "$baseUrl/share/project/$encodedName";
 
     // 🚀 NAYA: Rich Share Message with Property+ at top, Building Name, Location, Price
     final String message = "Property+\n\n"

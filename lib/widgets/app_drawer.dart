@@ -93,7 +93,7 @@ class AppDrawer extends StatelessWidget {
                   final String baseUrl = Uri.base.origin; 
                   final String rawContact = (authVM.userData?['contactNo'] ?? '').toString().trim();
                   final String cleanContact = rawContact.replaceAll(RegExp(r'\s+'), '');
-                  final refLink = "$baseUrl/#/login?ref=$cleanContact";
+                  final refLink = "$baseUrl/login?ref=$cleanContact";
                   Clipboard.setData(ClipboardData(text: refLink));
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(

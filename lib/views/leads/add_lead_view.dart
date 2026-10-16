@@ -1516,7 +1516,7 @@ class _AddLeadViewState extends State<AddLeadView> {
             final String location = project.displayLocation;
             final String baseUrl = (kIsWeb && Uri.base.hasAuthority) ? Uri.base.origin : 'https://propertyplus.web.app';
             final String encodedName = Uri.encodeComponent(project.projectName);
-            final String shareLink = "$baseUrl/#/share/project/$encodedName";
+            final String shareLink = "$baseUrl/share/project/$encodedName";
 
             final String message = "Property+\n\n"
                 "🏢 Building: ${project.projectName}\n"
