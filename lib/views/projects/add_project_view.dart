@@ -387,11 +387,6 @@ class _AddProjectViewState extends State<AddProjectView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_focusNodes.containsKey(fieldId)) {
         _focusNodes[fieldId]!.requestFocus();
-        final type = _getFieldType(fieldId);
-        final isTextInput = type == 'text' || type == 'searchable' || type == 'dropdown' || type == 'builder_selector' || type == 'multiline' || type == 'number';
-        if (isTextInput && !kIsWeb) {
-          SystemChannels.textInput.invokeMethod('textInput.show');
-        }
       }
     });
   }
@@ -849,8 +844,9 @@ class _AddProjectViewState extends State<AddProjectView> {
       }
       if (!anyVisible) return const SizedBox.shrink();
 
+      final String rowKeyStr = (field['fields'] as List).map((f) => f['id'].toString()).join('_');
       return Padding(
-        key: ValueKey('row_${field.hashCode}'),
+        key: ValueKey('row_$rowKeyStr'),
         padding: const EdgeInsets.only(bottom: 16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -867,8 +863,9 @@ class _AddProjectViewState extends State<AddProjectView> {
         ),
       );
     } else if (type == 'group') {
+      final String grpKeyStr = (field['fields'] as List).map((f) => f['id'].toString()).join('_');
       return Column(
-        key: ValueKey('grp_${field.hashCode}'),
+        key: ValueKey('grp_$grpKeyStr'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (field.containsKey('title')) ...[
@@ -2256,10 +2253,8 @@ class _AddProjectViewState extends State<AddProjectView> {
                 textInputAction: TextInputAction.next,
                 maxLines: maxLines,
                 onTap: () {
-                  if (ctrl.text.isEmpty) {
+                  if (options.isNotEmpty && ctrl.text.isEmpty) {
                     setState(() => _openDropdowns[id] = true);
-                    ctrl.text = ' ';
-                    ctrl.text = '';
                   }
                 },
                 decoration: _outlinedDecoration(label, id).copyWith(

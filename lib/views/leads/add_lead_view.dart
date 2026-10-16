@@ -974,8 +974,7 @@ class _AddLeadViewState extends State<AddLeadView> {
                   },
                   onTap: () {
                     if (finalOptions.isNotEmpty && textCtrl.text.isEmpty) {
-                      textCtrl.text = ' ';
-                      textCtrl.text = '';
+                      setState(() => _openDropdowns[id] = true);
                     }
                   },
                   onSubmitted: (_) {
