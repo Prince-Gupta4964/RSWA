@@ -38,6 +38,11 @@ import '../views/builders/builder_detail_view.dart';
 import '../features/bulk_whatsapp/screens/campaign_dashboard_screen.dart'; // 🚀 NAYA
 import '../features/bulk_whatsapp/screens/create_campaign_screen.dart'; // 🚀 NAYA
 import '../features/bulk_whatsapp/screens/template_builder_screen.dart'; // 🚀 NAYA
+import '../features/map_screen/screens/map_screen.dart';
+import '../features/map_screen/screens/task_detail_page.dart';
+import '../features/map_screen/models/task.dart';
+import '../features/map_screen/viewmodels/map_screen_viewmodel.dart';
+import '../features/map_screen/viewmodels/add_task_viewmodel.dart';
 import '../views/profile/my_profile_view.dart';
 import '../views/admin/dropdown_manager_view.dart';
 import '../views/admin/form_labels_manager_view.dart';
