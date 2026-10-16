@@ -2749,74 +2749,10 @@ class _AddProjectViewState extends State<AddProjectView> {
     _formData['lastUpdatedOn'] = nowStr;
     _controllers['lastUpdatedOn']?.text = nowStr;
 
-    setState(() { _isSaving = true; _loadingMessage = 'Uploading Files...'; });
+    setState(() { _isSaving = true; _loadingMessage = 'Saving Project...'; });
     try {
       final authVM = Provider.of<AuthViewModel>(context, listen: false);
       final String folderName = '${_formData['propertyName'] ?? 'project'}_${DateTime.now().millisecondsSinceEpoch}';
-      
-      for (var entry in _pickedMediaLists.entries) {
-        final String fieldId = entry.key;
-        if (entry.value.isEmpty) continue;
-        List<String> urls = List<String>.from(_formData[fieldId] is List ? _formData[fieldId] : []);
-        for (int i = 0; i < entry.value.length; i++) {
-          final file = entry.value[i];
-          setState(() {
-            _loadingMessage = 'Uploading $fieldId ${i + 1}/${entry.value.length}...';
-          });
-          final String ext = file.name.split('.').last;
-          final String path = 'projects/$folderName/${fieldId}_$i.$ext';
-          final url = await FirebaseStorageService.uploadFile(file, path);
-          if (url != null) urls.add(url);
-        }
-        _formData[fieldId] = urls;
-      }
-
-      for (var entry in _pickedFiles.entries) {
-        if (entry.value == null) continue;
-        final String fieldId = entry.key;
-        setState(() {
-          _loadingMessage = 'Uploading $fieldId...';
-        });
-
-        if (fieldId == 'projectVideo') {
-          Uint8List? videoBytes;
-          if (entry.value is XFile) {
-            videoBytes = await (entry.value as XFile).readAsBytes();
-          } else if (entry.value is PlatformFile) {
-            videoBytes = (entry.value as PlatformFile).bytes;
-          }
-
-          if (videoBytes != null) {
-            setState(() {
-              _loadingMessage = 'Uploading video to YouTube...';
-            });
-            final youtubeUrl = await YouTubeUploadService.uploadVideoBytes(
-              videoBytes: videoBytes,
-              title: _formData['propertyName']?.toString() ?? 'Project Video',
-              description: 'Project Video uploaded via Property+ App',
-              googleUser: authVM.lastGoogleUser,
-            );
-            if (youtubeUrl != null) {
-              _formData[fieldId] = youtubeUrl;
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Video successfully published to YouTube!'), backgroundColor: Colors.green),
-                );
-              }
-              continue;
-            } else {
-              throw 'YouTube video upload failed. Please check YouTube API quota or credentials.';
-            }
-          }
-          continue;
-        }
-
-        String fileName = (entry.value is XFile) ? (entry.value as XFile).name : (entry.value as PlatformFile).name;
-        final String ext = fileName.split('.').last;
-        final String path = 'projects/$folderName/$fieldId.$ext';
-        final url = await FirebaseStorageService.uploadFile(entry.value, path);
-        if (url != null) _formData[fieldId] = url;
-      }
 
       // 🚀 NAYA: Save any pending newly added builders to Firestore now
       if (_pendingBuilderNames.isNotEmpty) {
@@ -2868,9 +2804,11 @@ class _AddProjectViewState extends State<AddProjectView> {
       final String projName = _formData['propertyName'] ?? 'New Project';
       final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
 
+      final String finalDocId = _resolvedProject?.id ?? widget.projectId ?? _sanitizeDocIdLocal(projName);
+
       // Save Project Document to Firestore first (instant!)
       await projectVM.addOrUpdateProject(
-        id: _resolvedProject?.id ?? widget.projectId,
+        id: finalDocId,
         projectName: projName,
         propertyType: _formData['propertyType'] ?? 'Project',
         legality: _formData['isReraApproved'] == 'Yes' ? 'RERA Approved' : 'N/A',
@@ -2886,7 +2824,7 @@ class _AddProjectViewState extends State<AddProjectView> {
       );
 
       final String hasMediaToUpload = (_pickedMediaLists.values.any((l) => l.isNotEmpty) || _pickedFiles.values.any((f) => f != null) || _customAttachmentRows.any((r) => r['file'] != null))
-          ? ' Files uploading in background...'
+          ? ' Media uploading in background...'
           : '';
 
       if (mounted) {
@@ -2897,11 +2835,19 @@ class _AddProjectViewState extends State<AddProjectView> {
             duration: const Duration(seconds: 3),
           ),
         );
-        _navigateBackOnCancelOrSave(targetDocId: _resolvedProject?.id ?? widget.projectId ?? _sanitizeDocIdLocal(projName));
+        _navigateBackOnCancelOrSave(targetDocId: finalDocId);
       }
 
-      // Background Async Upload
-      _uploadProjectMediaInBackground(projName, Map.from(_pickedMediaLists), Map.from(_pickedFiles), List.from(_customAttachmentRows), folderName);
+      // Background Async Upload - Fire and forget!
+      _uploadProjectMediaInBackground(
+        finalDocId, 
+        projName, 
+        Map.from(_pickedMediaLists), 
+        Map.from(_pickedFiles), 
+        List.from(_customAttachmentRows), 
+        folderName,
+        authVM.lastGoogleUser,
+      );
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
@@ -2915,14 +2861,15 @@ class _AddProjectViewState extends State<AddProjectView> {
   }
 
   static Future<void> _uploadProjectMediaInBackground(
+    String documentId,
     String projectName,
     Map<String, List<dynamic>> pickedMediaLists,
     Map<String, dynamic> pickedFiles,
     List<Map<String, dynamic>> customAttachmentRows,
     String folderName,
+    dynamic googleUser,
   ) async {
     final db = FirebaseFirestore.instance;
-    final sanitizeId = _sanitizeDocIdStatic(projectName);
 
     try {
       for (var entry in pickedMediaLists.entries) {
@@ -2934,7 +2881,7 @@ class _AddProjectViewState extends State<AddProjectView> {
           final String path = 'projects/$folderName/${fieldId}_${DateTime.now().millisecondsSinceEpoch}_$i.$ext';
           final url = await FirebaseStorageService.uploadFile(file, path);
           if (url != null) {
-            final docSnap = await db.collection('projects').doc(sanitizeId).get();
+            final docSnap = await db.collection('projects').doc(documentId).get();
             if (docSnap.exists) {
               final data = docSnap.data() ?? {};
               final details = Map<String, dynamic>.from(data['propertyDetails'] ?? {});
@@ -2942,7 +2889,7 @@ class _AddProjectViewState extends State<AddProjectView> {
               if (!currentUrls.contains(url)) {
                 currentUrls.add(url);
                 details[fieldId] = currentUrls;
-                await db.collection('projects').doc(sanitizeId).update({
+                await db.collection('projects').doc(documentId).update({
                   'propertyDetails': details,
                   fieldId: currentUrls,
                 });
@@ -2955,18 +2902,55 @@ class _AddProjectViewState extends State<AddProjectView> {
       for (var entry in pickedFiles.entries) {
         if (entry.value == null) continue;
         final String fieldId = entry.key;
-        if (fieldId == 'projectVideo') continue; // 🚀 NEVER upload projectVideo to Firebase Storage
+
+        // 🚀 Handle YouTube Video Upload
+        if (fieldId == 'projectVideo') {
+          Uint8List? videoBytes;
+          if (entry.value is XFile) {
+            videoBytes = await (entry.value as XFile).readAsBytes();
+          } else if (entry.value is PlatformFile) {
+            videoBytes = (entry.value as PlatformFile).bytes;
+          }
+
+          if (videoBytes != null) {
+            try {
+              final youtubeUrl = await YouTubeUploadService.uploadVideoBytes(
+                videoBytes: videoBytes,
+                title: projectName,
+                description: 'Project Video uploaded via Property+ App',
+                googleUser: googleUser,
+              );
+              if (youtubeUrl != null) {
+                final docSnap = await db.collection('projects').doc(documentId).get();
+                if (docSnap.exists) {
+                  final data = docSnap.data() ?? {};
+                  final details = Map<String, dynamic>.from(data['propertyDetails'] ?? {});
+                  details[fieldId] = youtubeUrl;
+                  await db.collection('projects').doc(documentId).update({
+                    'propertyDetails': details,
+                    fieldId: youtubeUrl,
+                  });
+                }
+              }
+            } catch (e) {
+              debugPrint("YouTube background upload failed: $e");
+            }
+          }
+          continue; 
+        }
+
+        // 🚀 Handle normal file upload
         String fileName = (entry.value is XFile) ? (entry.value as XFile).name : (entry.value as PlatformFile).name;
         final String ext = fileName.split('.').last;
         final String path = 'projects/$folderName/${fieldId}_${DateTime.now().millisecondsSinceEpoch}.$ext';
         final url = await FirebaseStorageService.uploadFile(entry.value, path);
         if (url != null) {
-          final docSnap = await db.collection('projects').doc(sanitizeId).get();
+          final docSnap = await db.collection('projects').doc(documentId).get();
           if (docSnap.exists) {
             final data = docSnap.data() ?? {};
             final details = Map<String, dynamic>.from(data['propertyDetails'] ?? {});
             details[fieldId] = url;
-            await db.collection('projects').doc(sanitizeId).update({
+            await db.collection('projects').doc(documentId).update({
               'propertyDetails': details,
               fieldId: url,
             });
@@ -2986,14 +2970,14 @@ class _AddProjectViewState extends State<AddProjectView> {
           final String path = 'projects/$folderName/others_${DateTime.now().millisecondsSinceEpoch}_$i.$ext';
           final String? url = await FirebaseStorageService.uploadFile(file, path);
           if (url != null) {
-            final docSnap = await db.collection('projects').doc(sanitizeId).get();
+            final docSnap = await db.collection('projects').doc(documentId).get();
             if (docSnap.exists) {
               final data = docSnap.data() ?? {};
               final details = Map<String, dynamic>.from(data['propertyDetails'] ?? {});
               List<dynamic> currentAttachments = List<dynamic>.from(details['otherAttachments'] is List ? details['otherAttachments'] : []);
               currentAttachments.add({'title': title.isNotEmpty ? title : 'Attachment ${i + 1}', 'url': url});
               details['otherAttachments'] = currentAttachments;
-              await db.collection('projects').doc(sanitizeId).update({
+              await db.collection('projects').doc(documentId).update({
                 'propertyDetails': details,
                 'otherAttachments': currentAttachments,
               });
