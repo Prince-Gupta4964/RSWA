@@ -34,6 +34,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   String? _selectedTypeFilter;
   String? _selectedSubTypeFilter;
   String? _selectedConfigurationFilter;
+  RangeValues _selectedPriceRange = const RangeValues(0, 1000); // 🚀 NAYA: 0 to 1000 Lakhs (10 Cr+)
   String _searchQuery = '';
   String? _selectedCity;
   bool _isSearching = false; // 🚀 NAYA
@@ -128,7 +129,9 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
       _selectedConditionFilter != null ||
       _selectedTypeFilter != null ||
       _selectedSubTypeFilter != null ||
-      _selectedConfigurationFilter != null;
+      _selectedConfigurationFilter != null ||
+      _selectedPriceRange.start > 0 ||
+      _selectedPriceRange.end < 1000;
 
   void _clearAllFilters() {
     setState(() {
@@ -139,6 +142,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
       _selectedConfigurationFilter = null;
       _searchQuery = '';
       _selectedCity = null;
+      _selectedPriceRange = const RangeValues(0, 1000);
     });
   }
 
@@ -158,6 +162,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
           _selectedConfigurationFilter = null;
           _searchQuery = '';
           _selectedCity = null;
+          _selectedPriceRange = const RangeValues(0, 1000);
         });
       }
     }
@@ -265,6 +270,13 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     return formatted[0].toUpperCase() + formatted.substring(1);
   }
 
+  String _sliderLabel(double value) {
+    if (value == 0) return '₹ 0';
+    if (value >= 1000) return '₹ 10+ Cr';
+    if (value < 100) return '₹ ${value.toInt()} L';
+    return '₹ ${(value / 100).toStringAsFixed(1)} Cr';
+  }
+
   String _getDynamicListTitle() {
     String condition = _selectedConditionFilter ?? '';
     String type = _selectedTab == 'All' ? 'Projects' : '$_selectedTab Projects';
@@ -343,6 +355,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     String? tempConfig = _selectedConfigurationFilter;
     String? tempCity = _selectedCity;
     String? tempCondition = _selectedConditionFilter;
+    RangeValues tempPriceRange = _selectedPriceRange;
 
     showModalBottomSheet(
       context: context,
@@ -569,6 +582,40 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                         ),
                       ),
                     ),
+                    const SizedBox(height: 24),
+
+                    // 🚀 NAYA: Price Range Slider
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Budget / Price Range', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text('${_sliderLabel(tempPriceRange.start)} - ${_sliderLabel(tempPriceRange.end)}', 
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _primaryDark)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: _primaryDark,
+                        inactiveTrackColor: Colors.grey.shade300,
+                        thumbColor: _primaryDark,
+                        overlayColor: _primaryDark.withValues(alpha: 0.2),
+                        valueIndicatorColor: _primaryDark,
+                        valueIndicatorTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      child: RangeSlider(
+                        values: tempPriceRange,
+                        min: 0,
+                        max: 1000,
+                        divisions: 100,
+                        labels: RangeLabels(_sliderLabel(tempPriceRange.start), _sliderLabel(tempPriceRange.end)),
+                        onChanged: (RangeValues values) {
+                          setModalState(() {
+                            tempPriceRange = values;
+                          });
+                        },
+                      ),
+                    ),
                     const SizedBox(height: 32),
 
                     SizedBox(
@@ -583,6 +630,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                             _selectedConfigurationFilter = tempConfig;
                             _selectedCity = tempCity;
                             _selectedConditionFilter = tempCondition;
+                            _selectedPriceRange = tempPriceRange; // 🚀 NAYA
                             _selectedProjectIds.clear();
                           });
                           Navigator.pop(context);
@@ -1067,6 +1115,20 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                               if (!config.contains(_selectedConfigurationFilter!.toLowerCase())) return false;
                             }
                             if (!_matchesSelectedCondition(project)) return false;
+
+                            // 🚀 NAYA: Check Price Range
+                            if (_selectedPriceRange.start > 0 || _selectedPriceRange.end < 1000) {
+                              final det = project.propertyDetails;
+                              final bool isLand = project.propertyType == 'Land';
+                              final double minCost = double.tryParse((isLand ? (det['plotCostLand'] ?? det['minCostLand'] ?? det['minCost']) : (det['minCost'] ?? det['minCostLand']))?.toString().replaceAll(',', '') ?? '0') ?? 0;
+                              
+                              // Convert values to Lakhs for comparison
+                              final double minCostLakhs = minCost / 100000;
+                              
+                              if (minCostLakhs < _selectedPriceRange.start || minCostLakhs > _selectedPriceRange.end) {
+                                return false;
+                              }
+                            }
 
                             if (_selectedCity != null) {
                               final projLoc = project.displayLocation.toLowerCase();
