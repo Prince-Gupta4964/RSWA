@@ -385,7 +385,7 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: '/share/project/:projectName',
+        path: '/:initials/:projectName',
         builder: (context, state) {
           final projectName = state.pathParameters['projectName'] ?? '';
           return PublicProjectLoader(projectName: projectName);
