@@ -2889,10 +2889,10 @@ class _AddProjectViewState extends State<AddProjectView> {
               if (!currentUrls.contains(url)) {
                 currentUrls.add(url);
                 details[fieldId] = currentUrls;
-                await db.collection('projects').doc(documentId).update({
+                await db.collection('projects').doc(documentId).set({
                   'propertyDetails': details,
                   fieldId: currentUrls,
-                });
+                }, SetOptions(merge: true));
               }
             }
           }
@@ -2926,10 +2926,10 @@ class _AddProjectViewState extends State<AddProjectView> {
                   final data = docSnap.data() ?? {};
                   final details = Map<String, dynamic>.from(data['propertyDetails'] ?? {});
                   details[fieldId] = youtubeUrl;
-                  await db.collection('projects').doc(documentId).update({
+                  await db.collection('projects').doc(documentId).set({
                     'propertyDetails': details,
                     fieldId: youtubeUrl,
-                  });
+                  }, SetOptions(merge: true));
                 }
               }
             } catch (e) {
@@ -2950,10 +2950,10 @@ class _AddProjectViewState extends State<AddProjectView> {
             final data = docSnap.data() ?? {};
             final details = Map<String, dynamic>.from(data['propertyDetails'] ?? {});
             details[fieldId] = url;
-            await db.collection('projects').doc(documentId).update({
+            await db.collection('projects').doc(documentId).set({
               'propertyDetails': details,
               fieldId: url,
-            });
+            }, SetOptions(merge: true));
           }
         }
       }
@@ -2977,10 +2977,10 @@ class _AddProjectViewState extends State<AddProjectView> {
               List<dynamic> currentAttachments = List<dynamic>.from(details['otherAttachments'] is List ? details['otherAttachments'] : []);
               currentAttachments.add({'title': title.isNotEmpty ? title : 'Attachment ${i + 1}', 'url': url});
               details['otherAttachments'] = currentAttachments;
-              await db.collection('projects').doc(documentId).update({
+              await db.collection('projects').doc(documentId).set({
                 'propertyDetails': details,
                 'otherAttachments': currentAttachments,
-              });
+              }, SetOptions(merge: true));
             }
           }
         }

@@ -147,7 +147,7 @@ class ProjectViewModel extends ChangeNotifier {
     return output;
   }
 
-  Future<void> addOrUpdateProject({
+  Future<String> addOrUpdateProject({
     String? id,
     required String projectName,
     required String reraId,
@@ -222,6 +222,7 @@ class ProjectViewModel extends ChangeNotifier {
         }
       } else {
         await _db.collection('projects').doc(id).update(data);
+        return id;
       }
     } else {
       // 🚀 NEW PROJECT MODE: Set createdByUid and createdBy!
@@ -235,6 +236,8 @@ class ProjectViewModel extends ChangeNotifier {
       };
       await _db.collection('projects').doc(targetDocId).set(data, SetOptions(merge: true));
     }
+    
+    return targetDocId;
   }
 
   // --- NAYA FUNCTION: Inventory Add Karne Ke Liye ---
