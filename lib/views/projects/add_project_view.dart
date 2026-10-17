@@ -2804,11 +2804,9 @@ class _AddProjectViewState extends State<AddProjectView> {
       final String projName = _formData['propertyName'] ?? 'New Project';
       final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
 
-      final String finalDocId = _resolvedProject?.id ?? widget.projectId ?? _sanitizeDocIdLocal(projName);
-
       // Save Project Document to Firestore first (instant!)
-      await projectVM.addOrUpdateProject(
-        id: finalDocId,
+      final String actualDocId = await projectVM.addOrUpdateProject(
+        id: _resolvedProject?.id ?? widget.projectId,
         projectName: projName,
         propertyType: _formData['propertyType'] ?? 'Project',
         legality: _formData['isReraApproved'] == 'Yes' ? 'RERA Approved' : 'N/A',
@@ -2835,12 +2833,12 @@ class _AddProjectViewState extends State<AddProjectView> {
             duration: const Duration(seconds: 3),
           ),
         );
-        _navigateBackOnCancelOrSave(targetDocId: finalDocId);
+        _navigateBackOnCancelOrSave(targetDocId: actualDocId);
       }
 
       // Background Async Upload - Fire and forget!
       _uploadProjectMediaInBackground(
-        finalDocId, 
+        actualDocId, 
         projName, 
         Map.from(_pickedMediaLists), 
         Map.from(_pickedFiles), 
