@@ -279,24 +279,23 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   }
 
   List<LeadModel> _filterLeads(List<LeadModel> allLeads, String tabId, AuthViewModel authVM) {
+    final currentUserName = authVM.userName.trim().toLowerCase();
+    final currentUserUid = authVM.userUid;
+
     return allLeads.where((lead) {
-      final creatorUid = _getCreatorUid(lead.rawData['createdBy']);
-      final userId = lead.rawData['userId']?.toString() ?? '';
-      final assignee = lead.rawData['assign']?.toString() ?? '';
-      final advisor = lead.rawData['advisor']?.toString() ?? '';
+      final creatorUid = _getCreatorUid(lead.rawData['createdBy']).trim();
+      final userId = lead.rawData['userId']?.toString().trim() ?? '';
+      final assignee = lead.rawData['assign']?.toString().trim() ?? '';
+      final advisor = lead.rawData['advisor']?.toString().trim() ?? '';
       
       bool isMine = false;
 
-      // 🚀 NAYA: Strict ownership hierarchy (Advisor -> Assignee -> Creator)
-      if (advisor.isNotEmpty) {
-        if (advisor.toLowerCase() == authVM.userName.toLowerCase()) isMine = true;
-      } else if (assignee.isNotEmpty) {
-        if (assignee.toLowerCase() == authVM.userName.toLowerCase()) isMine = true;
-      } else {
-        if (creatorUid.isNotEmpty && creatorUid == authVM.userUid) isMine = true;
-        if (creatorUid.isNotEmpty && creatorUid.toLowerCase() == authVM.userName.toLowerCase()) isMine = true;
-        if (userId.isNotEmpty && userId == authVM.userUid) isMine = true;
-      }
+      // 🚀 NAYA: Inclusive ownership (Creator, Assignee, and Advisor ALL can see it in 'My Clients')
+      if (creatorUid.isNotEmpty && creatorUid == currentUserUid) isMine = true;
+      if (creatorUid.isNotEmpty && creatorUid.toLowerCase() == currentUserName) isMine = true;
+      if (userId.isNotEmpty && userId == currentUserUid) isMine = true;
+      if (assignee.isNotEmpty && assignee.toLowerCase() == currentUserName) isMine = true;
+      if (advisor.isNotEmpty && advisor.toLowerCase() == currentUserName) isMine = true;
 
       if (tabId == 'all_clients') {
         if (!authVM.canSeeAllLeads) return false;
@@ -313,13 +312,13 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         }
       } else if (tabId == 'advisor') {
         if (advisor.isEmpty) return false;
-        if (!authVM.canSeeAllLeads && advisor.toLowerCase() != authVM.userName.toLowerCase()) return false;
+        if (!authVM.canSeeAllLeads && advisor.toLowerCase() != currentUserName) return false;
       } else if (tabId == 'fav_leads') {
-        if (!lead.favUids.contains(authVM.userUid)) return false;
+        if (!lead.favUids.contains(currentUserUid)) return false;
       }
 
       if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.toLowerCase();
+        final q = _searchQuery.toLowerCase().trim();
         if (!lead.name.toLowerCase().contains(q) &&
             !lead.contact.toLowerCase().contains(q)) return false;
       }
