@@ -14,6 +14,7 @@ import '../../viewmodels/cp_viewmodel.dart';
 import '../../viewmodels/project_viewmodel.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/app_configuration_viewmodel.dart';
+import '../../viewmodels/user_management_viewmodel.dart'; // 🚀 NAYA
 import '../../features/bulk_whatsapp/services/whatsapp_api_service.dart';
 import '../../models/lead_model.dart';
 import '../../models/cp_model.dart';
@@ -332,6 +333,16 @@ class _AddLeadViewState extends State<AddLeadView> {
     } else if (fieldType == 'cp_dropdown') {
       final cpVM = Provider.of<CPViewModel>(context, listen: false);
       staticOptions = cpVM.cps.map((c) => c.cpName).where((s) => s.isNotEmpty).toList();
+      
+      // 🚀 NAYA: Also include internal users (Admins, Office Staff, etc.) from users collection
+      final userVM = Provider.of<UserManagementViewModel>(context, listen: false);
+      final userNames = userVM.users.map((u) => u.name).where((s) => s.isNotEmpty).toList();
+      for (var name in userNames) {
+        if (!staticOptions.contains(name)) {
+          staticOptions.add(name);
+        }
+      }
+
       for (var l in leadVM.leads) {
         final src = l.rawData['source']?.toString().trim() ?? '';
         if (src.isNotEmpty && !staticOptions.contains(src)) staticOptions.add(src);
