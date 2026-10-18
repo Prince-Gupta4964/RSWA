@@ -24,6 +24,7 @@ import '../views/leads/lead_detail_view.dart';
 import '../views/leads/today_task_form_view.dart';
 import '../views/leads/task_detail_view.dart';
 import '../views/leads/followup_history_view.dart';
+import '../views/leads/advisor_leads_view.dart'; // 🚀 NAYA
 import '../views/cp_network/add_cp_view.dart';
 import '../views/cp_network/cp_list_view.dart';
 import '../views/cp_network/cp_detail_view.dart';
