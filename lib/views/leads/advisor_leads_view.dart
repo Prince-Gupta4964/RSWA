@@ -16,6 +16,15 @@ class AdvisorLeadsView extends StatefulWidget {
 
 class _AdvisorLeadsViewState extends State<AdvisorLeadsView> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final leadVM = Provider.of<LeadViewModel>(context, listen: false);
+      leadVM.setGroupBy('advisor_details', 'Status'); // 🚀 NAYA: Force group by Status for drill-down view
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final leadVM = Provider.of<LeadViewModel>(context);
 
