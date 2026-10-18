@@ -21,6 +21,7 @@ class LeadViewModel extends ChangeNotifier {
   String getSortBy(String tabId) => _tabSortBy[tabId] ?? 'Date';
   bool getIsAscending(String tabId) => _tabIsAscending[tabId] ?? false;
   String getGroupBy(String tabId) => _tabGroupBy[tabId] ?? 'Status';
+  bool hasCustomGroupBy(String tabId) => _tabGroupBy.containsKey(tabId);
   Map<String, dynamic> getFilters(String tabId) => _tabFilters[tabId] ?? {};
 
   // Legacy getters for backward compatibility if needed, though we should transition to tabId-based

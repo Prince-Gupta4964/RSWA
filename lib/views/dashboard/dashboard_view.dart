@@ -622,6 +622,14 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
               
               final tabLeads = _filterLeads(allVisibleLeads, tab['id']!, authVM);
 
+              // 🚀 NAYA: Force 'Advisor' grouping for the Advisor tab if not overridden by user
+              final String effectiveTabId = tab['id']!;
+              if (effectiveTabId == 'advisor') {
+                if (!leadVM.hasCustomGroupBy(effectiveTabId)) {
+                  leadVM.setGroupBy(effectiveTabId, 'Advisor');
+                }
+              }
+
               return ListView(
                 padding: EdgeInsets.zero,
                 children: [
