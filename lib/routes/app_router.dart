@@ -301,6 +301,15 @@ class AppRouter {
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
+        path: '/advisor-leads/:advisorName',
+        builder: (context, state) {
+          final advisorName = state.pathParameters['advisorName'] ?? 'Advisor';
+          final decodedName = Uri.decodeComponent(advisorName);
+          return AuthGuard(child: AdvisorLeadsView(advisorName: decodedName));
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/add-cp',
         builder: (context, state) {
           final cp = state.extra as CPModel?;
