@@ -143,62 +143,41 @@ class _FollowUpHistoryViewState extends State<FollowUpHistoryView> {
                         padding: const EdgeInsets.all(16),
                         margin: const EdgeInsets.only(bottom: 16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFF8E1),
+                          color: const Color(0xFFFFF9E6), // 🚀 NAYA: Background color from screenshot
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.amber.shade200, width: 1),
                         ),
-                        child: Column(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.amber.shade300,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(Icons.calendar_today_rounded, color: Colors.brown, size: 22),
-                                ),
-                                const SizedBox(width: 12),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Lead age', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                                    const SizedBox(height: 2),
-                                    Text('$leadAge days', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                    const Text('since lead was created', style: TextStyle(color: Colors.grey, fontSize: 10)),
-                                  ],
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.amber.shade300,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(Icons.bar_chart_rounded, color: Colors.brown, size: 22),
-                                ),
-                                const SizedBox(width: 10),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('$totalFollowUps', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                    const Text('Follow-ups', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                                  ],
-                                ),
-                              ],
+                            // Left Section: Calendar icon & Lead age text
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFE2A3), // Darker yellow/brown from screenshot
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.calendar_month_rounded, color: Color(0xFF5C4033), size: 28),
                             ),
-                            const SizedBox(height: 12),
-                            const Divider(height: 1),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: [
-                                _statPill(Icons.phone_rounded, '$totalCalls Calls', Colors.blue.shade700, Colors.blue.shade50),
-                                _statPill(Icons.chat_bubble_rounded, '$totalWa Msg', Colors.green.shade700, Colors.green.shade50),
-                                _statPill(Icons.groups_rounded, '$totalMeetings Meets', Colors.purple.shade700, Colors.purple.shade50),
-                              ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Lead age', style: TextStyle(color: Colors.black54, fontSize: 13)),
+                                  Text('$leadAge days', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Colors.black)),
+                                  const Text('since lead was created', style: TextStyle(color: Colors.black54, fontSize: 11)),
+                                ],
+                              ),
                             ),
+                            
+                            // Right Section: Small Stats columns
+                            _buildStatColumn(Icons.phone_rounded, totalCalls.toString(), 'Calls', Colors.blue.shade700, Colors.blue.shade50),
+                            const SizedBox(width: 12),
+                            _buildStatColumn(Icons.chat_rounded, totalWa.toString(), 'Msg', Colors.green.shade700, Colors.green.shade50),
+                            const SizedBox(width: 12),
+                            _buildStatColumn(Icons.groups_rounded, totalMeetings.toString(), 'Meets', Colors.deepPurple.shade600, Colors.deepPurple.shade50),
+                            const SizedBox(width: 12),
+                            _buildStatColumn(Icons.bar_chart_rounded, totalFollowUps.toString(), 'Follow-ups', Colors.orange.shade700, Colors.orange.shade50),
                           ],
                         ),
                       ),
@@ -252,21 +231,22 @@ class _FollowUpHistoryViewState extends State<FollowUpHistoryView> {
     );
   }
 
-  Widget _statPill(IconData icon, String label, Color textColor, Color bgColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: textColor),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 12)),
-        ],
-      ),
+  // 🚀 NAYA: Helper for Vertical Stat Columns
+  Widget _buildStatColumn(IconData icon, String count, String label, Color iconColor, Color iconBg) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: iconBg,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
+        const SizedBox(height: 6),
+        Text(count, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+      ],
     );
   }
 
