@@ -38,7 +38,7 @@ class _CampaignDashboardScreenState extends State<CampaignDashboardScreen> {
               icon: const Icon(Icons.add),
               label: const Text('New Campaign'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7A3BFF), // Purple theme from screenshot
+                backgroundColor: const Color(0xFF25D366), // 🚀 NAYA: WhatsApp Green theme
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
@@ -89,7 +89,7 @@ class _CampaignDashboardScreenState extends State<CampaignDashboardScreen> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       decoration: const BoxDecoration(
-                                        gradient: LinearGradient(colors: [Color(0xFF9E5CFF), Color(0xFF6B1BFF)]),
+                                        color: Color(0xFF25D366), // 🚀 NAYA: WhatsApp Green
                                         borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
                                       ),
                                       child: Row(
@@ -169,7 +169,7 @@ class _CampaignDashboardScreenState extends State<CampaignDashboardScreen> {
                                           LinearProgressIndicator(
                                             value: c.progress,
                                             backgroundColor: Colors.grey.shade200,
-                                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF7A3BFF)),
+                                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF25D366)), // 🚀 NAYA: WhatsApp Green
                                             minHeight: 6,
                                             borderRadius: BorderRadius.circular(4),
                                           ),

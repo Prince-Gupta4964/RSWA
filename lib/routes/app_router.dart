@@ -24,7 +24,6 @@ import '../views/leads/lead_detail_view.dart';
 import '../views/leads/today_task_form_view.dart';
 import '../views/leads/task_detail_view.dart';
 import '../views/leads/followup_history_view.dart';
-import '../views/leads/advisor_leads_view.dart'; // 🚀 NAYA
 import '../views/cp_network/add_cp_view.dart';
 import '../views/cp_network/cp_list_view.dart';
 import '../views/cp_network/cp_detail_view.dart';
@@ -297,15 +296,6 @@ class AppRouter {
             return AuthGuard(child: LeadDetailView(lead: emptyLead));
           }
           return AuthGuard(child: LeadDetailView(lead: lead, initiallyExpandedSection: expand));
-        },
-      ),
-      GoRoute(
-        parentNavigatorKey: _rootNavigatorKey,
-        path: '/advisor-leads/:advisorName',
-        builder: (context, state) {
-          final advisorName = state.pathParameters['advisorName'] ?? 'Advisor';
-          final decodedName = Uri.decodeComponent(advisorName);
-          return AuthGuard(child: AdvisorLeadsView(advisorName: decodedName));
         },
       ),
       GoRoute(
