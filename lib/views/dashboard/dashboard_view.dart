@@ -283,12 +283,20 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       final creatorUid = _getCreatorUid(lead.rawData['createdBy']);
       final userId = lead.rawData['userId']?.toString() ?? '';
       final assignee = lead.rawData['assign']?.toString() ?? '';
+      final advisor = lead.rawData['advisor']?.toString() ?? '';
       
       bool isMine = false;
-      if (creatorUid.isNotEmpty && creatorUid == authVM.userUid) isMine = true;
-      if (creatorUid.isNotEmpty && creatorUid.toLowerCase() == authVM.userName.toLowerCase()) isMine = true;
-      if (userId.isNotEmpty && userId == authVM.userUid) isMine = true;
-      if (assignee.isNotEmpty && assignee.toLowerCase() == authVM.userName.toLowerCase()) isMine = true;
+
+      // 🚀 NAYA: Strict ownership hierarchy (Advisor -> Assignee -> Creator)
+      if (advisor.isNotEmpty) {
+        if (advisor.toLowerCase() == authVM.userName.toLowerCase()) isMine = true;
+      } else if (assignee.isNotEmpty) {
+        if (assignee.toLowerCase() == authVM.userName.toLowerCase()) isMine = true;
+      } else {
+        if (creatorUid.isNotEmpty && creatorUid == authVM.userUid) isMine = true;
+        if (creatorUid.isNotEmpty && creatorUid.toLowerCase() == authVM.userName.toLowerCase()) isMine = true;
+        if (userId.isNotEmpty && userId == authVM.userUid) isMine = true;
+      }
 
       if (tabId == 'all_clients') {
         if (!authVM.canSeeAllLeads) return false;
@@ -303,6 +311,9 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         if (!authVM.canSeeAllLeads) {
           if (!isMine) return false;
         }
+      } else if (tabId == 'advisor') {
+        if (advisor.isEmpty) return false;
+        if (!authVM.canSeeAllLeads && advisor.toLowerCase() != authVM.userName.toLowerCase()) return false;
       } else if (tabId == 'fav_leads') {
         if (!lead.favUids.contains(authVM.userUid)) return false;
       }
