@@ -431,19 +431,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
 
     final String baseUrl = Uri.base.origin;
     final String encodedName = Uri.encodeComponent(widget.project.projectName);
-    
-    // Generate initials
-    String initials = 'pr';
-    final words = widget.project.projectName.trim().split(RegExp(r'\s+'));
-    if (words.isNotEmpty) {
-      if (words.length == 1) {
-        initials = words.first.length > 1 ? words.first.substring(0, 2).toLowerCase() : words.first.toLowerCase();
-      } else {
-        initials = '${words.first[0]}${words.last[0]}'.toLowerCase();
-      }
-    }
-    
-    final String shareLink = "$baseUrl/$initials/$encodedName";
+    final String shareLink = "$baseUrl/share/project/$encodedName";
 
     // 🚀 NAYA: Rich Share Message
     final String message = "Property+\n\n"

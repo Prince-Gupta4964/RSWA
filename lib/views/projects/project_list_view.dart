@@ -1972,19 +1972,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
 
     final String baseUrl = Uri.base.origin;
     final String encodedName = Uri.encodeComponent(project.projectName);
-    
-    // Generate initials
-    String initials = 'pr';
-    final words = project.projectName.trim().split(RegExp(r'\s+'));
-    if (words.isNotEmpty) {
-      if (words.length == 1) {
-        initials = words.first.length > 1 ? words.first.substring(0, 2).toLowerCase() : words.first.toLowerCase();
-      } else {
-        initials = '${words.first[0]}${words.last[0]}'.toLowerCase();
-      }
-    }
-    
-    final String shareLink = "$baseUrl/$initials/$encodedName";
+    final String shareLink = "$baseUrl/share/project/$encodedName";
 
     // 🚀 NAYA: Rich Share Message with Property+ at top, Building Name, Location, Price
     final String message = "Property+\n\n"

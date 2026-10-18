@@ -280,11 +280,20 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
 
   List<LeadModel> _filterLeads(List<LeadModel> allLeads, String tabId, AuthViewModel authVM) {
     return allLeads.where((lead) {
+      final creatorUid = _getCreatorUid(lead.rawData['createdBy']);
+      final userId = lead.rawData['userId']?.toString() ?? '';
+      final assignee = lead.rawData['assign']?.toString() ?? '';
+      
+      bool isMine = false;
+      if (creatorUid.isNotEmpty && creatorUid == authVM.userUid) isMine = true;
+      if (creatorUid.isNotEmpty && creatorUid.toLowerCase() == authVM.userName.toLowerCase()) isMine = true;
+      if (userId.isNotEmpty && userId == authVM.userUid) isMine = true;
+      if (assignee.isNotEmpty && assignee.toLowerCase() == authVM.userName.toLowerCase()) isMine = true;
+
       if (tabId == 'all_clients') {
         if (!authVM.canSeeAllLeads) return false;
       } else if (tabId == 'my_leads') {
-        final creatorUid = _getCreatorUid(lead.rawData['createdBy']);
-        if (creatorUid != authVM.userUid) return false;
+        if (!isMine) return false;
       } else if (tabId == 'paid_leads') {
         final milestones = ['Visit', 'Revisit', 'Token', 'Loan process', 'Downpayment', 'Registration', 'Disbursement', 'Possession'];
         final stage = lead.rawData['journeyStage']?.toString() ?? 'Visit';
@@ -292,8 +301,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         if (idx < 2) return false;
 
         if (!authVM.canSeeAllLeads) {
-          final creatorUid = _getCreatorUid(lead.rawData['createdBy']);
-          if (creatorUid != authVM.userUid) return false;
+          if (!isMine) return false;
         }
       } else if (tabId == 'fav_leads') {
         if (!lead.favUids.contains(authVM.userUid)) return false;
