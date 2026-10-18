@@ -239,7 +239,7 @@ class _CreateCampaignScreenState extends State<CreateCampaignScreen> {
                                     title: Text(lead.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                     subtitle: Text(lead.contact, style: const TextStyle(fontSize: 11)),
                                     dense: true,
-                                    activeColor: const Color(0xFF7A3BFF),
+                                    activeColor: Colors.blue, // 🚀 NAYA: Blue for active elements
                                   );
                                 },
                               ),
@@ -254,7 +254,7 @@ class _CreateCampaignScreenState extends State<CreateCampaignScreen> {
                       Radio<String>(
                         value: 'Write Message',
                         groupValue: _messageMode,
-                        activeColor: const Color(0xFF7A3BFF),
+                        activeColor: Colors.blue, // 🚀 NAYA: Blue for active elements
                         onChanged: (val) => setState(() {
                           if (val != null) {
                             _messageMode = val;
@@ -267,7 +267,7 @@ class _CreateCampaignScreenState extends State<CreateCampaignScreen> {
                       Radio<String>(
                         value: 'Use App Template',
                         groupValue: _messageMode,
-                        activeColor: const Color(0xFF7A3BFF),
+                        activeColor: Colors.blue, // 🚀 NAYA: Blue for active elements
                         onChanged: (val) => setState(() {
                           if (val != null) _messageMode = val;
                         }),
@@ -404,7 +404,7 @@ class _CreateCampaignScreenState extends State<CreateCampaignScreen> {
                     child: ElevatedButton(
                       onPressed: () => _createCampaign(leads),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7A3BFF),
+                        backgroundColor: const Color(0xFF25D366), // 🚀 NAYA: WhatsApp Green Button
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),

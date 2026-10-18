@@ -169,7 +169,7 @@ class _CampaignDashboardScreenState extends State<CampaignDashboardScreen> {
                                           LinearProgressIndicator(
                                             value: c.progress,
                                             backgroundColor: Colors.grey.shade200,
-                                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.yellow), // 🚀 NAYA: Yellow Color
+                                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.blueAccent), // 🚀 NAYA: Yellow Color
                                             minHeight: 6,
                                             borderRadius: BorderRadius.circular(4),
                                           ),

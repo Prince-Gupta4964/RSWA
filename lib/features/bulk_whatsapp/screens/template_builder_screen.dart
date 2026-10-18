@@ -222,7 +222,7 @@ class _TemplateBuilderScreenState extends State<TemplateBuilderScreen> {
           _isSaving
               ? const Padding(padding: EdgeInsets.all(16.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
               : IconButton(
-                  icon: const Icon(Icons.check, color: Color(0xFF7A3BFF)),
+                  icon: const Icon(Icons.check, color: Color(0xFF25D366)), // 🚀 NAYA: WhatsApp Green
                   onPressed: _saveTemplate,
                 )
         ],
