@@ -143,7 +143,7 @@ class AppPermissions {
           canConfigureTabs: false,
           canCreateCustomFilters: false,
           canSeeAllProjects: true,
-          canSeeAllLeads: true,
+          canSeeAllLeads: false, // 🚀 NAYA: Office staff should only see their own (and assigned) leads
           canSeeMonitoring: true,
           canAddProjects: true,
           canAddLeads: true,
