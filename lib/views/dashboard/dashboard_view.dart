@@ -622,12 +622,52 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
               
               final tabLeads = _filterLeads(allVisibleLeads, tab['id']!, authVM);
 
-              // 🚀 NAYA: Force 'Advisor' grouping for the Advisor tab if not overridden by user
               final String effectiveTabId = tab['id']!;
+
+              // 🚀 NAYA: Advisor Tab - List of Advisors
               if (effectiveTabId == 'advisor') {
-                if (!leadVM.hasCustomGroupBy(effectiveTabId)) {
-                  leadVM.setGroupBy(effectiveTabId, 'Advisor');
+                final Map<String, int> advisorCounts = {};
+                for (var lead in tabLeads) {
+                  final String adv = lead.rawData['advisor']?.toString().trim() ?? '';
+                  if (adv.isNotEmpty) {
+                    advisorCounts[adv] = (advisorCounts[adv] ?? 0) + 1;
+                  }
                 }
+
+                if (advisorCounts.isEmpty) {
+                  return Center(
+                    child: Text('No advisors found.', style: TextStyle(color: Colors.grey.shade500)),
+                  );
+                }
+
+                final List<String> sortedAdvisors = advisorCounts.keys.toList()..sort();
+
+                return ListView.separated(
+                  padding: const EdgeInsets.only(top: 12, bottom: 80),
+                  itemCount: sortedAdvisors.length,
+                  separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey.shade200),
+                  itemBuilder: (context, index) {
+                    final advisor = sortedAdvisors[index];
+                    final count = advisorCounts[advisor];
+                    return ListTile(
+                      tileColor: Colors.white,
+                      leading: CircleAvatar(
+                        backgroundColor: const Color(0xFFFF6B22).withOpacity(0.1),
+                        child: Text(
+                          advisor.isNotEmpty ? advisor[0].toUpperCase() : '?',
+                          style: const TextStyle(color: Color(0xFFFF6B22), fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      title: Text(advisor, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      subtitle: Text('$count Leads assigned', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                      onTap: () {
+                        final encodedAdvisor = Uri.encodeComponent(advisor);
+                        context.push('/advisor-leads/$encodedAdvisor');
+                      },
+                    );
+                  },
+                );
               }
 
               return ListView(
