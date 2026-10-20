@@ -162,7 +162,7 @@ class AppPermissions {
           canSeeMonitoring: false,
           canAddProjects: true,
           canAddLeads: true,
-          dashboardTabs: ['dashboard', 'projects', 'leads', 'cp', 'map'],
+          dashboardTabs: ['projects', 'dashboard'], // 🚀 NAYA: CP only sees Projects and Leads tabs
         );
       case AppRole.viewer:
         return const AppPermissions(
