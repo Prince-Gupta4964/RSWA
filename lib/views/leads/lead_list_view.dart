@@ -376,7 +376,7 @@ class _LeadTileState extends State<_LeadTile> {
           _buildCircleIconBtn(icon: isFav ? Icons.favorite : Icons.favorite_border, color: isFav ? Colors.red : Colors.grey, onTap: () => leadVM.toggleFavorite(widget.lead.id, authVM.userUid, widget.lead.favUids)),
           _buildCircleIconBtn(icon: Icons.edit_outlined, color: Colors.blue, onTap: () => context.push('/add-lead/${widget.lead.id}', extra: widget.lead)),
           _buildCircleIconBtn(icon: Icons.calendar_today_outlined, color: const Color(0xFFFF6B22), onTap: () => context.push('/add-task', extra: widget.lead)),
-          _buildCircleIconBtn(icon: Icons.history_outlined, color: Colors.purple, onTap: () => _showHistoryBottomSheet(context, leadVM)),
+          _buildCircleIconBtn(icon: Icons.history_outlined, color: Colors.purple, onTap: () => context.push('/followup-history', extra: widget.lead)),
           _buildCircleIconBtn(icon: Icons.label_outline, color: Colors.orange, onTap: () => _showStatusPopup(context)),
         ],
       ),

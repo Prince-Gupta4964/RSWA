@@ -155,7 +155,11 @@ class _LeadDetailViewState extends State<LeadDetailView> {
                 const SizedBox(height: 12.0),
                 
                 _buildSection('Follow-up History', Icons.history_edu_outlined, [
-                  Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    TextButton(
+                      onPressed: () => context.push('/followup-history', extra: currentLead),
+                      child: const Text('View All', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                    ),
                     TextButton.icon(
                       onPressed: () => context.push('/add-task', extra: currentLead), 
                       icon: const Icon(Icons.add_circle, size: 18.0, color: Color(0xFFFF6B22)), 
