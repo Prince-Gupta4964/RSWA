@@ -36,7 +36,19 @@ class CPViewModel extends ChangeNotifier {
     List<CPModel> customersList = [];
 
     void updateCombined() {
-      final combined = [...cpsList, ...customersList];
+      // 🚀 NAYA: Remove duplicates based on ID (email) when combining cpsList and customersList
+      final Map<String, CPModel> uniqueMap = {};
+      for (var cp in cpsList) {
+        uniqueMap[cp.id] = cp;
+      }
+      for (var customer in customersList) {
+        if (!uniqueMap.containsKey(customer.id)) {
+          uniqueMap[customer.id] = customer;
+        }
+      }
+
+      final combined = uniqueMap.values.toList();
+      
       combined.sort((a, b) {
         final t1 = a.rawData['timestamp'];
         final t2 = b.rawData['timestamp'];
@@ -97,8 +109,7 @@ class CPViewModel extends ChangeNotifier {
     return output;
   }
 
-  // Naya CP Add aur Update karne ka function (RERA ID aur saare fields ke sath)
-  Future<void> addOrUpdateCP(
+  Future<String> addOrUpdateCP(
     Map<String, dynamic> cpData, {
     String? id,
     Map<String, dynamic>? actorMetadata,
@@ -121,6 +132,7 @@ class CPViewModel extends ChangeNotifier {
 
     if (id != null && id.isNotEmpty) {
       await _db.collection('cps').doc(id).set(data, SetOptions(merge: true));
+      return id;
     } else {
       data['timestamp'] = FieldValue.serverTimestamp();
       if (actorMetadata != null) {
@@ -132,7 +144,8 @@ class CPViewModel extends ChangeNotifier {
           data['addedBy'] = actorMetadata['name'];
         }
       }
-      await _db.collection('cps').add(data);
+      final docRef = await _db.collection('cps').add(data);
+      return docRef.id;
     }
   }
 

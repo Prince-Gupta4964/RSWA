@@ -704,7 +704,7 @@ class _AddCPViewState extends State<AddCPView> {
       final cpVM = Provider.of<CPViewModel>(context, listen: false);
 
       // Save CP Document to Firestore first (instant!)
-      await cpVM.addOrUpdateCP(
+      final String actualDocId = await cpVM.addOrUpdateCP(
         _formData,
         id: _resolvedCP?.id ?? widget.cpId,
         actorMetadata: authVM.actorMetadata,
@@ -726,9 +726,8 @@ class _AddCPViewState extends State<AddCPView> {
       }
 
       // Non-blocking background uploads
-      if (_resolvedCP?.id != null || widget.cpId != null || cpVM.cps.isNotEmpty) {
-        final targetDocId = _resolvedCP?.id ?? widget.cpId ?? cpVM.cps.first.id;
-        _uploadCPMediaInBackground(targetDocId, Map.from(_pickedImages), folderName);
+      if (actualDocId.isNotEmpty) {
+        _uploadCPMediaInBackground(actualDocId, Map.from(_pickedImages), folderName);
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
