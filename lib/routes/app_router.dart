@@ -637,7 +637,6 @@ class _MainShellState extends State<MainShell> {
     final authVM = Provider.of<AuthViewModel>(context);
     final String currentLoc = GoRouterState.of(context).uri.toString();
     final bool hideBottomNav = !authVM.isProfileComplete ||
-        !authVM.isApproved ||
         currentLoc.contains('complete-profile') ||
         currentLoc.contains('approval-pending');
 
