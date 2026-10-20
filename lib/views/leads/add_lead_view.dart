@@ -180,7 +180,22 @@ class _AddLeadViewState extends State<AddLeadView> {
   }
 
   void _onFieldChanged(String id, String val) {
-    _formData[id] = val;
+    if (_getFieldType(id) == 'cp_dropdown') {
+      // 🚀 NAYA: Extract the clean name and email separately
+      final match = RegExp(r"^(.*?)\s*\((.*?)\)$").firstMatch(val);
+      if (match != null) {
+        final String namePart = match.group(1)?.trim() ?? val;
+        final String emailPart = match.group(2)?.trim() ?? '';
+        
+        _formData[id] = namePart; // Keep just the name visible/saved for legacy
+        _formData['${id}Email'] = emailPart; // Also store their email for uniqueness
+      } else {
+        _formData[id] = val;
+      }
+    } else {
+      _formData[id] = val;
+    }
+
     if (id == 'referralName1') {
       _updateMultiLevelReferrals(val);
     }
@@ -332,11 +347,11 @@ class _AddLeadViewState extends State<AddLeadView> {
       }
     } else if (fieldType == 'cp_dropdown') {
       final cpVM = Provider.of<CPViewModel>(context, listen: false);
-      staticOptions = cpVM.cps.map((c) => c.cpName).where((s) => s.isNotEmpty).toList();
+      staticOptions = cpVM.cps.map((c) => "${c.cpName} (${c.id})").where((s) => s.isNotEmpty).toList();
       
       // 🚀 NAYA: Also include internal users (Admins, Office Staff, etc.) from users collection
       final userVM = Provider.of<UserManagementViewModel>(context, listen: false);
-      final userNames = userVM.users.map((u) => u.name).where((s) => s.isNotEmpty).toList();
+      final userNames = userVM.users.map((u) => "${u.name} (${u.email})").where((s) => s.isNotEmpty).toList();
       for (var name in userNames) {
         if (!staticOptions.contains(name)) {
           staticOptions.add(name);

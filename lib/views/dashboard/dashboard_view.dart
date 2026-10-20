@@ -280,13 +280,16 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
 
   List<LeadModel> _filterLeads(List<LeadModel> allLeads, String tabId, AuthViewModel authVM) {
     final currentUserName = authVM.userName.trim().toLowerCase();
+    final currentUserEmail = authVM.userEmail.trim().toLowerCase();
     final currentUserUid = authVM.userUid;
 
     return allLeads.where((lead) {
       final creatorUid = _getCreatorUid(lead.rawData['createdBy']).trim();
       final userId = lead.rawData['userId']?.toString().trim() ?? '';
       final assignee = lead.rawData['assign']?.toString().trim() ?? '';
+      final assigneeEmail = lead.rawData['assignEmail']?.toString().trim().toLowerCase() ?? '';
       final advisor = lead.rawData['advisor']?.toString().trim() ?? '';
+      final advisorEmail = lead.rawData['advisorEmail']?.toString().trim().toLowerCase() ?? '';
       
       bool isMine = false;
 
@@ -294,8 +297,20 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       if (creatorUid.isNotEmpty && creatorUid == currentUserUid) isMine = true;
       if (creatorUid.isNotEmpty && creatorUid.toLowerCase() == currentUserName) isMine = true;
       if (userId.isNotEmpty && userId == currentUserUid) isMine = true;
-      if (assignee.isNotEmpty && assignee.toLowerCase() == currentUserName) isMine = true;
-      if (advisor.isNotEmpty && advisor.toLowerCase() == currentUserName) isMine = true;
+      
+      // Check Assignee by Email OR Name
+      if (assigneeEmail.isNotEmpty && assigneeEmail == currentUserEmail) {
+        isMine = true;
+      } else if (assignee.isNotEmpty && assignee.toLowerCase() == currentUserName) {
+        isMine = true;
+      }
+      
+      // Check Advisor by Email OR Name
+      if (advisorEmail.isNotEmpty && advisorEmail == currentUserEmail) {
+        isMine = true;
+      } else if (advisor.isNotEmpty && advisor.toLowerCase() == currentUserName) {
+        isMine = true;
+      }
 
       if (tabId == 'all_clients') {
         if (!authVM.canSeeAllLeads) return false;
@@ -312,7 +327,10 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         }
       } else if (tabId == 'advisor') {
         if (advisor.isEmpty) return false;
-        if (!authVM.canSeeAllLeads && advisor.toLowerCase() != currentUserName) return false;
+        if (!authVM.canSeeAllLeads) {
+          if (advisorEmail.isNotEmpty && advisorEmail != currentUserEmail) return false;
+          if (advisorEmail.isEmpty && advisor.toLowerCase() != currentUserName) return false;
+        }
       } else if (tabId == 'fav_leads') {
         if (!lead.favUids.contains(currentUserUid)) return false;
       }
@@ -628,8 +646,11 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                 final Map<String, int> advisorCounts = {};
                 for (var lead in tabLeads) {
                   final String adv = lead.rawData['advisor']?.toString().trim() ?? '';
+                  final String advEmail = lead.rawData['advisorEmail']?.toString().trim().toLowerCase() ?? '';
+                  final String key = advEmail.isNotEmpty ? "$adv|$advEmail" : "$adv|";
+                  
                   if (adv.isNotEmpty) {
-                    advisorCounts[adv] = (advisorCounts[adv] ?? 0) + 1;
+                    advisorCounts[key] = (advisorCounts[key] ?? 0) + 1;
                   }
                 }
 
@@ -639,15 +660,18 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                   );
                 }
 
-                final List<String> sortedAdvisors = advisorCounts.keys.toList()..sort();
+                final List<String> sortedAdvisorKeys = advisorCounts.keys.toList()..sort();
 
                 return ListView.separated(
                   padding: const EdgeInsets.only(top: 12, bottom: 80),
-                  itemCount: sortedAdvisors.length,
+                  itemCount: sortedAdvisorKeys.length,
                   separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey.shade200),
                   itemBuilder: (context, index) {
-                    final advisor = sortedAdvisors[index];
-                    final count = advisorCounts[advisor];
+                    final key = sortedAdvisorKeys[index];
+                    final parts = key.split('|');
+                    final advisor = parts[0];
+                    final advisorEmail = parts.length > 1 ? parts[1] : '';
+                    final count = advisorCounts[key];
                     return ListTile(
                       tileColor: Colors.white,
                       leading: CircleAvatar(
@@ -658,11 +682,13 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                         ),
                       ),
                       title: Text(advisor, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      subtitle: Text('$count Leads assigned', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      subtitle: Text(advisorEmail.isNotEmpty ? '$advisorEmail\n$count Leads assigned' : '$count Leads assigned', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      isThreeLine: advisorEmail.isNotEmpty,
                       trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                       onTap: () {
-                        final encodedAdvisor = Uri.encodeComponent(advisor);
-                        context.push('/advisor-leads/$encodedAdvisor');
+                        // Pass both name and email to identify perfectly
+                        final encodedKey = Uri.encodeComponent(key);
+                        context.push('/advisor-leads/$encodedKey');
                       },
                     );
                   },

@@ -28,10 +28,21 @@ class _AdvisorLeadsViewState extends State<AdvisorLeadsView> {
   Widget build(BuildContext context) {
     final leadVM = Provider.of<LeadViewModel>(context);
 
-    // Filter leads specifically for this advisor
+    // 🚀 NAYA: Decode both name and email from the unique string key
+    final parts = widget.advisorName.split('|');
+    final String targetName = parts[0].toLowerCase();
+    final String targetEmail = parts.length > 1 ? parts[1].toLowerCase() : '';
+
+    // Filter leads specifically for this exact advisor
     final List<LeadModel> advisorLeads = leadVM.leads.where((lead) {
-      final advisor = lead.rawData['advisor']?.toString().trim() ?? '';
-      return advisor.toLowerCase() == widget.advisorName.toLowerCase();
+      final advisorName = lead.rawData['advisor']?.toString().trim().toLowerCase() ?? '';
+      final advisorEmail = lead.rawData['advisorEmail']?.toString().trim().toLowerCase() ?? '';
+      
+      // If we have an email target, strictly match the email. Otherwise fallback to name match.
+      if (targetEmail.isNotEmpty) {
+        return advisorEmail == targetEmail;
+      }
+      return advisorName == targetName;
     }).toList();
 
     return Scaffold(
@@ -48,12 +59,12 @@ class _AdvisorLeadsViewState extends State<AdvisorLeadsView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.advisorName,
+              parts[0], // Display original formatted name
               style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
             ),
-            const Text(
-              'Advisor Leads',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
+            Text(
+              targetEmail.isNotEmpty ? 'Advisor: $targetEmail' : 'Advisor Leads',
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
             ),
           ],
         ),
