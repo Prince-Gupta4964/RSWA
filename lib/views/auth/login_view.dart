@@ -67,7 +67,7 @@ class _LoginViewState extends State<LoginView> {
     if (authVM.appRole == AppRole.viewer) {
       context.go('/projects');
     } else {
-      context.go('/dashboard');
+      context.go('/projects'); // 🚀 NAYA: Everyone defaults to Projects tab first
     }
   }
 

@@ -55,17 +55,17 @@ class _AppBottomNavState extends State<AppBottomNav> {
 
     final allItems = <_NavItem>[
       _NavItem(
-        keyName: 'dashboard',
-        label: 'Leads',
-        icon: Icons.home_rounded,
-        branchIndex: 0,
-        customOnTap: widget.onDashboardTap,
-      ),
-      _NavItem(
         keyName: 'projects',
         label: widget.projectsLabel,
         icon: Icons.business_rounded,
-        branchIndex: 1,
+        branchIndex: 0, // 🚀 NAYA: Projects is now tab 0
+      ),
+      _NavItem(
+        keyName: 'dashboard',
+        label: 'Leads',
+        icon: Icons.home_rounded,
+        branchIndex: 1, // 🚀 NAYA: Leads/Dashboard is now tab 1
+        customOnTap: widget.onDashboardTap,
       ),
       _NavItem(
         keyName: 'cp',

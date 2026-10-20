@@ -89,7 +89,17 @@ class AppRouter {
           return MainShell(navigationShell: navigationShell);
         },
         branches: [
-          // Branch 0: Dashboard (Leads)
+          // Branch 0: Projects (🚀 NAYA: Moved to first tab)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/projects',
+                pageBuilder: (context, state) =>
+                    const NoTransitionPage(child: AuthGuard(child: ProjectListView())),
+              ),
+            ],
+          ),
+          // Branch 1: Dashboard (Leads) (🚀 NAYA: Moved to second tab)
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -107,16 +117,6 @@ class AppRouter {
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          // Branch 1: Projects
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/projects',
-                pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: AuthGuard(child: ProjectListView())),
               ),
             ],
           ),
@@ -676,13 +676,13 @@ class _MainShellState extends State<MainShell> {
 
   String _getTabKey(int index) {
     switch (index) {
-      case 0: return 'dashboard';
-      case 1: return 'projects';
+      case 0: return 'projects'; // 🚀 NAYA: Projects is now tab 0
+      case 1: return 'dashboard'; // 🚀 NAYA: Leads/Dashboard is now tab 1
       case 2: return 'cp';
       case 3: return 'builders';
       case 4: return 'admin';
       case 5: return 'map';
-      default: return 'dashboard';
+      default: return 'projects';
     }
   }
 }
