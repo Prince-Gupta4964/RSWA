@@ -235,7 +235,22 @@ class AuthViewModel extends ChangeNotifier {
     }
 
     // Create new document
-    final bool isCustomer = _signupMode == 'customer' || _signupMode == 'viewer';
+    final bool hasReferral = referralCode != null && referralCode.trim().isNotEmpty;
+    bool isCustomer = false;
+
+    // 🚀 NAYA: Logic to correctly assign Customer vs CP
+    if (_signupMode == 'customer' || _signupMode == 'viewer') {
+      isCustomer = true;
+    } else if (_signupMode == null || _signupMode!.isEmpty) {
+      if (!hasReferral) {
+        // No mode and no referral -> Direct customer
+        isCustomer = true;
+      } else {
+        // No mode but has referral -> CP invited by another CP
+        isCustomer = false;
+      }
+    }
+
     final String targetRole = isCustomer ? 'viewer' : 'cp';
     final String collection = isCustomer ? 'customers' : 'cps';
 

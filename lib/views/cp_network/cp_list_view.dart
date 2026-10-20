@@ -99,14 +99,24 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
                              cp.status.toLowerCase().contains('pending') ||
                              cp.status.toLowerCase().contains('unapproved');
 
+      final bool isCustomerRole = cp.rawData['collection'] == 'customers' ||
+          cp.rawData['role']?.toString().toLowerCase() == 'viewer' ||
+          cp.rawData['profession']?.toString().toLowerCase() == 'viewer' ||
+          cp.profession.toLowerCase() == 'viewer';
+
       switch (tabId) {
         case 'my_cp':
+          if (isCustomerRole) return false; // 🚀 NAYA: Customers don't show in My CP
           return isOwn;
 
         case 'all_cp':
-          return isAdmin; // Admin sees all CPs
+          if (!isAdmin) return false;
+          if (isPending) return false; // 🚀 NAYA: Only approved CPs show in All CP
+          if (isCustomerRole) return false; // Customers don't show here
+          return true;
 
         case 'fav_cp':
+          if (isCustomerRole) return false;
           final favUids = List<dynamic>.from(cp.rawData['favUids'] ?? []);
           return favUids.contains(authVM.userUid);
 
@@ -119,17 +129,13 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
           return isAdmin || isOwn;
 
         case 'pending':
-          final bool isCustomerRole = cp.rawData['role']?.toString().toLowerCase() == 'viewer' ||
-              cp.profession.toLowerCase() == 'viewer' ||
-              cp.rawData['collection'] == 'customers';
-          if (!isPending && !isCustomerRole) return false;
+          if (isCustomerRole) return false; // 🚀 NAYA: Customers don't show in Pending CPs
+          if (!isPending) return false; // 🚀 NAYA: Only unapproved CPs show in Pending
           return isAdmin || isOwn;
 
         case 'customers':
-          return (cp.rawData['collection'] == 'customers') ||
-                 (cp.rawData['role']?.toString().toLowerCase() == 'viewer') ||
-                 (cp.rawData['profession']?.toString().toLowerCase() == 'viewer') ||
-                 (cp.profession.toLowerCase() == 'viewer');
+          if (!isAdmin) return false;
+          return isCustomerRole;
 
         default:
           return true;
