@@ -1086,8 +1086,8 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                           final bool isLiked = authVM.userUid.isNotEmpty && favUids.contains(authVM.userUid);
 
                           if (currentTabName == 'All Projects') {
-                            // 🚀 NAYA: Show approved projects TO EVERYONE, plus user's OWN submitted projects (even if pending) to the user!
-                            if (!isApprovedBool && !isMine) return false;
+                            // 🚀 NAYA: All Projects strictly shows only approved projects
+                            if (!isApprovedBool) return false;
                           } else if (currentTabName == 'Pending') {
                             if (isApprovedBool) return false;
                           } else if (currentTabName == 'My Projects') {
