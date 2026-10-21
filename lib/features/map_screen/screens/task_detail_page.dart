@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/task.dart';
 import '../models/floating_sheet_type.dart';
+import '../utils/task_title_formatter.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
@@ -17,15 +17,14 @@ import 'views/date_time_picker_dialog.dart';
 class TaskDetailPage extends StatefulWidget {
   final Task task;
   final VoidCallback onChanged;
-  final VoidCallback onDelete;
+  final Future<void> Function() onSave;
 
   const TaskDetailPage({
     super.key,
     required this.task,
+    required this.onSave,
     VoidCallback? onChanged,
-    VoidCallback? onDelete,
-  }) : onChanged = onChanged ?? _defaultCallback,
-       onDelete = onDelete ?? _defaultCallback;
+  }) : onChanged = onChanged ?? _defaultCallback;
 
   static void _defaultCallback() {}
 
@@ -40,9 +39,12 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   late TextEditingController _noteController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _showAdditionalDetails = false;
+  Future<String?>? _createdByNameFuture;
 
   // for steps
   late TextEditingController _stepController;
+  final FocusNode _stepFocusNode = FocusNode();
   bool _isAddingStep = false;
   int? _editingStepIndex;
 
@@ -58,6 +60,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   List<String>? _clientsCache;
   List<String>? _foldersCache;
   List<String>? _projectsCache; // 🚀 NAYA
+  bool _isSaving = false;
 
   static const Color primaryColor = Color(0xFFFBE64E);
   static const Color secondaryColor = Color(0xFF6B5800);
@@ -77,6 +80,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     task.title = _titleController.text;
     _noteController.dispose();
     _stepController.dispose();
+    _stepFocusNode.dispose();
     _searchController.dispose();
     _titleController.dispose();
     super.dispose();
@@ -245,17 +249,11 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       projects = _projectsCache;
     }
 
+    if (!mounted || !buttonContext.mounted) return;
     final OverlayState overlayState = Overlay.of(buttonContext);
     final RenderBox button = buttonContext.findRenderObject() as RenderBox;
     final RenderBox overlayBox =
         overlayState.context.findRenderObject() as RenderBox;
-
-    final Offset buttonPosition = button.localToGlobal(
-      Offset.zero,
-      ancestor: overlayBox,
-    );
-    final Size buttonSize = button.size;
-    final Size overlaySize = overlayBox.size;
 
     List<Widget> tilesFor(String key) {
       switch (key) {
@@ -264,7 +262,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             ListTile(title: Text("U1")),
             ListTile(title: Text("U2")),
             ListTile(title: Text("U3")),
-            ListTile(title: Text("Urgent")),
             ListTile(title: Text("IMP")),
             ListTile(title: Text("Today")),
             ListTile(title: Text("Tomorrow")),
@@ -328,197 +325,235 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         resolvedKey == 'clientName' ||
         resolvedKey == 'refProject';
 
-    const double menuWidth = 260;
-    const double padding = 8;
-
-    double left = buttonPosition.dx + buttonSize.width - menuWidth;
-    if (left < padding) left = padding;
-
-    double top = buttonPosition.dy + buttonSize.height + padding;
+    const double maxMenuWidth = 260;
+    const double horizontalPadding = 4;
+    const double verticalPadding = 8;
+    const double optionRowHeight = 56;
+    const int visibleOptionCount = 3;
 
     _overlayEntry = OverlayEntry(
       builder: (context) {
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: _hideOverlay,
-                behavior: HitTestBehavior.translucent,
-                child: const SizedBox.shrink(),
-              ),
-            ),
-            Positioned(
-              left: left,
-              top: top,
-              child: Material(
-                color: Colors.white,
-                elevation: 6,
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: menuWidth,
-                  child: StatefulBuilder(
-                    builder: (context, setOverlayState) {
-                      final allTiles = tileWidgets;
-                      final filteredTiles =
-                          hasSearchBar && _searchQuery.isNotEmpty
-                          ? allTiles.where((tile) {
-                              if (tile is! ListTile) return true;
-                              final text = (tile.title as Text).data ?? '';
-                              return text.toLowerCase().contains(
-                                _searchQuery.toLowerCase(),
-                              );
-                            }).toList()
-                          : allTiles;
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final currentButtonPosition = button.localToGlobal(
+              Offset.zero,
+              ancestor: overlayBox,
+            );
+            final menuWidth = (constraints.maxWidth - horizontalPadding * 2)
+                .clamp(0.0, maxMenuWidth)
+                .toDouble();
+            final spaceAbove = (currentButtonPosition.dy - verticalPadding)
+                .clamp(0.0, constraints.maxHeight)
+                .toDouble();
+            final menuMaxHeight = spaceAbove;
+            final maxOptionListHeight =
+                (menuMaxHeight - (hasSearchBar ? 72 : 0))
+                    .clamp(0.0, optionRowHeight * visibleOptionCount)
+                    .toDouble();
 
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (hasSearchBar)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
-                              child: TextField(
-                                controller: _searchController,
-                                autofocus: true,
-                                decoration: InputDecoration(
-                                  hintText: 'Search...',
-                                  hintStyle: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey.shade400,
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: _hideOverlay,
+                    behavior: HitTestBehavior.translucent,
+                    child: const SizedBox.shrink(),
+                  ),
+                ),
+                Positioned(
+                  right: horizontalPadding,
+                  bottom:
+                      constraints.maxHeight -
+                      currentButtonPosition.dy +
+                      verticalPadding,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: menuMaxHeight),
+                    child: Material(
+                      color: Colors.white,
+                      elevation: 6,
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        width: menuWidth,
+                        child: StatefulBuilder(
+                          builder: (context, setOverlayState) {
+                            final allTiles = tileWidgets;
+                            final filteredTiles =
+                                hasSearchBar && _searchQuery.isNotEmpty
+                                ? allTiles.where((tile) {
+                                    if (tile is! ListTile) return true;
+                                    final text =
+                                        (tile.title as Text).data ?? '';
+                                    return text.toLowerCase().contains(
+                                      _searchQuery.toLowerCase(),
+                                    );
+                                  }).toList()
+                                : allTiles;
+                            final optionListHeight =
+                                (filteredTiles.length * optionRowHeight)
+                                    .clamp(0.0, maxOptionListHeight)
+                                    .toDouble();
+
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (hasSearchBar)
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      10,
+                                      10,
+                                      10,
+                                      6,
+                                    ),
+                                    child: TextField(
+                                      controller: _searchController,
+                                      autofocus: true,
+                                      decoration: InputDecoration(
+                                        hintText: 'Search...',
+                                        hintStyle: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey.shade400,
+                                        ),
+                                        prefixIcon: Icon(
+                                          Icons.search,
+                                          size: 18,
+                                          color: Colors.grey.shade500,
+                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 8,
+                                            ),
+                                        isDense: true,
+                                        filled: true,
+                                        fillColor: Colors.grey.shade100,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                      ),
+                                      onChanged: (val) {
+                                        _searchQuery = val;
+                                        setOverlayState(() {});
+                                      },
+                                    ),
                                   ),
-                                  prefixIcon: Icon(
-                                    Icons.search,
-                                    size: 18,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 8,
-                                  ),
-                                  isDense: true,
-                                  filled: true,
-                                  fillColor: Colors.grey.shade100,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                                onChanged: (val) {
-                                  _searchQuery = val;
-                                  setOverlayState(() {});
-                                },
-                              ),
-                            ),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxHeight: 220),
-                            child: filteredTiles.isEmpty
-                                ? Padding(
+                                if (filteredTiles.isEmpty)
+                                  Padding(
                                     padding: const EdgeInsets.all(16),
                                     child: Text(
                                       'No results found',
                                       style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: 14,
                                         color: Colors.grey.shade500,
                                       ),
                                     ),
                                   )
-                                : ListView(
-                                    padding: EdgeInsets.zero,
-                                    shrinkWrap: true,
-                                    children: filteredTiles.map((tile) {
-                                      return InkWell(
-                                        onTap: () async {
-                                          if (tile is ListTile) {
-                                            final label =
-                                                (tile.title as Text).data ?? '';
+                                else
+                                  SizedBox(
+                                    height: optionListHeight,
+                                    child: ListView(
+                                      padding: EdgeInsets.zero,
+                                      children: filteredTiles.map((tile) {
+                                        return InkWell(
+                                          onTap: () async {
+                                            if (tile is ListTile) {
+                                              final label =
+                                                  (tile.title as Text).data ??
+                                                  '';
 
-                                            if (resolvedKey == 'reminder' ||
-                                                resolvedKey == 'deadline') {
-                                              DateTime? computed;
+                                              if (resolvedKey == 'reminder' ||
+                                                  resolvedKey == 'deadline') {
+                                                DateTime? computed;
 
-                                              if (label.toLowerCase().contains(
-                                                'custom',
-                                              )) {
-                                                _hideOverlay();
-                                                computed =
-                                                    await showDateTimePickerWithTabs(
-                                                      context,
-                                                    );
+                                                if (label
+                                                    .toLowerCase()
+                                                    .contains('custom')) {
+                                                  _hideOverlay();
+                                                  computed =
+                                                      await showDateTimePickerWithTabs(
+                                                        context,
+                                                      );
+                                                } else {
+                                                  computed =
+                                                      QuickDateTimeOptions.resolve(
+                                                        label,
+                                                      );
+                                                }
+
+                                                if (computed != null) {
+                                                  final iso = computed
+                                                      .toIso8601String();
+                                                  setState(() {
+                                                    if (resolvedKey ==
+                                                        'reminder') {
+                                                      task.reminder = iso;
+                                                    } else {
+                                                      task.deadline = iso;
+                                                    }
+                                                  });
+                                                  widget.onChanged();
+                                                }
                                               } else {
-                                                computed =
-                                                    QuickDateTimeOptions.resolve(
-                                                      label,
-                                                    );
-                                              }
-
-                                              if (computed != null) {
-                                                final iso = computed
-                                                    .toIso8601String();
                                                 setState(() {
-                                                  if (resolvedKey ==
-                                                      'reminder') {
-                                                    task.reminder = iso;
-                                                  } else {
-                                                    task.deadline = iso;
+                                                  switch (resolvedKey) {
+                                                    case 'priority':
+                                                      task.priority = label;
+                                                      task.priorityUpdatedAt =
+                                                          DateTime.now()
+                                                              .millisecondsSinceEpoch;
+                                                      break;
+                                                    case 'assignee':
+                                                      task.assignee = label;
+                                                      _sendTaskAssignmentNotification(
+                                                        label,
+                                                        task.title,
+                                                        context,
+                                                      );
+                                                      break;
+                                                    case 'workType':
+                                                      task.workType = label;
+                                                      break;
+                                                    case 'clientName':
+                                                      task.clientName = label;
+                                                      break;
+                                                    case 'refProject':
+                                                      task.refProject = label;
+                                                      break;
+                                                    case 'folder':
+                                                      task.folder = label;
+                                                      break;
+                                                    default:
+                                                      break;
                                                   }
                                                 });
                                                 widget.onChanged();
                                               }
-                                            } else {
-                                              setState(() {
-                                                switch (resolvedKey) {
-                                                  case 'priority':
-                                                    task.priority = label;
-                                                    task.priorityUpdatedAt =
-                                                        DateTime.now()
-                                                            .millisecondsSinceEpoch;
-                                                    break;
-                                                  case 'assignee':
-                                                    task.assignee = label;
-                                                    _sendTaskAssignmentNotification(
-                                                      label,
-                                                      task.title,
-                                                      context,
-                                                    );
-                                                    break;
-                                                  case 'workType':
-                                                    task.workType = label;
-                                                    break;
-                                                  case 'clientName':
-                                                    task.clientName = label;
-                                                    break;
-                                                  case 'refProject':
-                                                    task.refProject = label;
-                                                    break;
-                                                  case 'folder':
-                                                    task.folder = label;
-                                                    break;
-                                                  default:
-                                                    break;
-                                                }
-                                              });
-                                              widget.onChanged();
-                                            }
 
-                                            _searchController.clear();
-                                            _searchQuery = '';
-                                            _hideOverlay();
-                                          } else {
-                                            _hideOverlay();
-                                          }
-                                        },
-                                        child: tile,
-                                      );
-                                    }).toList(),
+                                              _searchController.clear();
+                                              _searchQuery = '';
+                                              _hideOverlay();
+                                            } else {
+                                              _hideOverlay();
+                                            }
+                                          },
+                                          child: tile,
+                                        );
+                                      }).toList(),
+                                    ),
                                   ),
-                          ),
-                        ],
-                      );
-                    },
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         );
       },
     );
@@ -539,13 +574,18 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
   void _saveStep(String value) {
     final text = value.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty) {
+      _stepFocusNode.requestFocus();
+      return;
+    }
     setState(() {
       task.steps.add(TaskStep(title: text));
-      _isAddingStep = false;
       _stepController.clear();
     });
     widget.onChanged();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _isAddingStep) _stepFocusNode.requestFocus();
+    });
   }
 
   void _startEditStep(int index) {
@@ -589,20 +629,30 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       },
     );
 
-    if (confirm == true) {
-      setState(() {
-        if (index >= 0 && index < task.steps.length) {
-          task.steps.removeAt(index);
-        }
-      });
+    if (confirm != true || index < 0 || index >= task.steps.length) return;
+
+    final removedStep = task.steps.removeAt(index);
+    setState(() {});
+    widget.onChanged();
+
+    try {
+      await widget.onSave();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => task.steps.insert(index, removedStep));
       widget.onChanged();
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Could not delete substep: $error')),
+        );
     }
   }
 
   Widget _buildStepTile(TaskStep step, int index) {
     final isEditing = _editingStepIndex == index;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 2.0),
       child: Row(
         children: [
           GestureDetector(
@@ -632,7 +682,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     child: Text(
                       step.title,
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 16,
                         decoration: step.isDone
                             ? TextDecoration.lineThrough
                             : TextDecoration.none,
@@ -642,6 +692,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           ),
           if (isEditing)
             IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               icon: const Icon(Icons.close, size: 18),
               onPressed: () {
                 setState(() {
@@ -652,6 +705,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             )
           else
             IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               icon: const Icon(
                 Icons.delete_outline,
                 size: 20,
@@ -662,17 +718,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             ),
         ],
       ),
-    );
-  }
-
-  Widget _borderedTile({required Widget child}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: child,
     );
   }
 
@@ -698,8 +743,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   Widget _infoTrailing(String? value) {
     if (value == null || value.isEmpty) {
       return Text(
-        "None",
-        style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+        'None',
+        style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
       );
     }
 
@@ -727,7 +772,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         style: const TextStyle(
           color: secondaryColor,
           fontWeight: FontWeight.w600,
-          fontSize: 13,
+          fontSize: 14,
         ),
       );
     } catch (_) {
@@ -736,13 +781,35 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         style: const TextStyle(
           color: secondaryColor,
           fontWeight: FontWeight.w600,
-          fontSize: 13,
+          fontSize: 14,
         ),
       );
     }
   }
 
   bool _isSelected(String? value) => value != null && value.isNotEmpty;
+
+  Future<void> _saveTask() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    task
+      ..title = _titleController.text
+      ..note = _noteController.text;
+    try {
+      await widget.onSave();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Task saved')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Could not save task: $error')));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
 
   Widget _priorityBadgeHeader() {
     final p = task.priority;
@@ -756,7 +823,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       child: Text(
         p,
         style: const TextStyle(
-          fontSize: 13,
+          fontSize: 14,
           color: secondaryColor,
           fontWeight: FontWeight.w600,
         ),
@@ -804,6 +871,23 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           style: TextStyle(color: secondaryColor, fontWeight: FontWeight.bold),
         ),
         iconTheme: const IconThemeData(color: secondaryColor),
+        actions: [
+          TextButton(
+            onPressed: _isSaving ? null : _saveTask,
+            style: TextButton.styleFrom(foregroundColor: secondaryColor),
+            child: _isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: secondaryColor,
+                    ),
+                  )
+                : const Text('Save'),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -844,7 +928,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                     border: InputBorder.none,
                                   ),
                                   style: const TextStyle(
-                                    fontSize: 20,
+                                    fontSize: 24,
                                     fontWeight: FontWeight.w600,
                                   ),
                                   onSubmitted: _saveTitle,
@@ -857,9 +941,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                     });
                                   },
                                   child: Text(
-                                    task.title,
+                                    capitalizeFirstCharacter(task.title),
                                     style: TextStyle(
-                                      fontSize: 20,
+                                      fontSize: 24,
                                       fontWeight: FontWeight.w600,
                                       decoration: task.isDone
                                           ? TextDecoration.lineThrough
@@ -890,7 +974,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                             Expanded(
                               child: TextField(
                                 controller: _stepController,
+                                focusNode: _stepFocusNode,
                                 autofocus: true,
+                                textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
                                   hintText: "Add step",
                                   border: InputBorder.none,
@@ -901,6 +987,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                             IconButton(
                               icon: const Icon(Icons.close, size: 18),
                               onPressed: () {
+                                _stepFocusNode.unfocus();
                                 setState(() {
                                   _isAddingStep = false;
                                   _stepController.clear();
@@ -929,7 +1016,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                 "Add step",
                                 style: TextStyle(
                                   color: secondaryColor,
-                                  fontSize: 15,
+                                  fontSize: 16,
                                 ),
                               ),
                             ],
@@ -953,6 +1040,24 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                           onTap: () => _showOverlay(
                             buttonContext,
                             FloatingSheetType.priority,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Builder(
+                      builder: (buttonContext) => _animatedBorderedTile(
+                        isSelected: _isSelected(task.workType),
+                        child: ListTile(
+                          leading: const Icon(
+                            Icons.insert_drive_file,
+                            color: secondaryColor,
+                          ),
+                          title: const Text("Work Type"),
+                          trailing: _infoTrailing(task.workType),
+                          onTap: () => _showOverlay(
+                            buttonContext,
+                            FloatingSheetType.workType,
+                            fieldKey: 'workType',
                           ),
                         ),
                       ),
@@ -993,41 +1098,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     ),
                     Builder(
                       builder: (buttonContext) => _animatedBorderedTile(
-                        isSelected: _isSelected(task.deadline),
-                        child: ListTile(
-                          leading: const Icon(
-                            Icons.alarm,
-                            color: secondaryColor,
-                          ),
-                          title: const Text("Deadline"),
-                          trailing: _infoTrailing(task.deadline),
-                          onTap: () => _showOverlay(
-                            buttonContext,
-                            FloatingSheetType.deadline,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Builder(
-                      builder: (buttonContext) => _animatedBorderedTile(
-                        isSelected: _isSelected(task.workType),
-                        child: ListTile(
-                          leading: const Icon(
-                            Icons.insert_drive_file,
-                            color: secondaryColor,
-                          ),
-                          title: const Text("Work Type"),
-                          trailing: _infoTrailing(task.workType),
-                          onTap: () => _showOverlay(
-                            buttonContext,
-                            FloatingSheetType.workType,
-                            fieldKey: 'workType',
-                          ),
-                        ),
-                      ),
-                    ),
-                    Builder(
-                      builder: (buttonContext) => _animatedBorderedTile(
                         isSelected: _isSelected(task.clientName),
                         child: ListTile(
                           leading: const Icon(
@@ -1046,76 +1116,170 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     ),
                     Builder(
                       builder: (buttonContext) => _animatedBorderedTile(
-                        isSelected: _isSelected(task.refProject),
+                        isSelected: _isSelected(task.deadline),
                         child: ListTile(
                           leading: const Icon(
-                            Icons.apartment_outlined,
+                            Icons.alarm,
                             color: secondaryColor,
                           ),
-                          title: const Text("Ref Project"),
-                          trailing: _infoTrailing(task.refProject),
+                          title: const Text("Deadline"),
+                          trailing: _infoTrailing(task.deadline),
                           onTap: () => _showOverlay(
                             buttonContext,
-                            FloatingSheetType.refProject,
-                            fieldKey: 'refProject',
+                            FloatingSheetType.deadline,
                           ),
                         ),
                       ),
                     ),
-                    Builder(
-                      builder: (buttonContext) => _animatedBorderedTile(
-                        isSelected: _isSelected(task.folder),
-                        child: ListTile(
-                          leading: const Icon(
-                            Icons.folder_outlined,
-                            color: secondaryColor,
+                    Align(
+                      alignment: Alignment.center,
+                      child: InkWell(
+                        onTap: () => setState(
+                          () =>
+                              _showAdditionalDetails = !_showAdditionalDetails,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
                           ),
-                          title: const Text("Folder"),
-                          trailing: _infoTrailing(task.folder),
-                          onTap: () => _showOverlay(
-                            buttonContext,
-                            FloatingSheetType.folder,
-                            fieldKey: 'folder',
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _showAdditionalDetails
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.keyboard_arrow_down,
+                                color: Colors.black87,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _showAdditionalDetails
+                                    ? 'View less'
+                                    : 'View more',
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 12),
-
-                    // 🚀 NAYA: Extra Fields Editor (Start, End, Acc, Monitor, Remark)
-                    _buildExtraFieldRow('Start Time', task.startTime, (val) {
-                      setState(() {
-                        task.startTime = val;
-                      });
-                      widget.onChanged();
-                    }, isTime: true),
-                    _buildExtraFieldRow('End Time', task.endTime, (val) {
-                      setState(() {
-                        task.endTime = val;
-                      });
-                      widget.onChanged();
-                    }, isTime: true),
-                    _buildExtraFieldRow('Accompanied By', task.accompaniedBy, (
-                      val,
-                    ) {
-                      setState(() {
-                        task.accompaniedBy = val;
-                      });
-                      widget.onChanged();
-                    }),
-                    _buildExtraFieldRow('Monitor', task.monitor, (val) {
-                      setState(() {
-                        task.monitor = val;
-                      });
-                      widget.onChanged();
-                    }),
-                    _buildExtraFieldRow('Remark', task.remark, (val) {
-                      setState(() {
-                        task.remark = val;
-                      });
-                      widget.onChanged();
-                    }),
+                    if (_showAdditionalDetails) ...[
+                      Builder(
+                        builder: (buttonContext) => _animatedBorderedTile(
+                          isSelected: _isSelected(task.refProject),
+                          child: ListTile(
+                            leading: const Icon(
+                              Icons.apartment_outlined,
+                              color: secondaryColor,
+                            ),
+                            title: const Text("Ref Project"),
+                            trailing: _infoTrailing(task.refProject),
+                            onTap: () => _showOverlay(
+                              buttonContext,
+                              FloatingSheetType.refProject,
+                              fieldKey: 'refProject',
+                            ),
+                          ),
+                        ),
+                      ),
+                      _buildExtraFieldTile(
+                        label: 'Start Time',
+                        value: task.startTime,
+                        icon: Icons.access_time,
+                        onTap: (buttonContext) => _pickExtraTime(
+                          buttonContext,
+                          (value) => task.startTime = value,
+                        ),
+                      ),
+                      _buildExtraFieldTile(
+                        label: 'End Time',
+                        value: task.endTime,
+                        icon: Icons.access_time,
+                        onTap: (buttonContext) => _pickExtraTime(
+                          buttonContext,
+                          (value) => task.endTime = value,
+                        ),
+                      ),
+                      _buildExtraFieldTile(
+                        label: 'Accompanied By',
+                        value: task.accompaniedBy,
+                        icon: Icons.person_outline,
+                        onTap: (buttonContext) => _editExtraField(
+                          buttonContext,
+                          'Accompanied By',
+                          task.accompaniedBy,
+                          (value) => task.accompaniedBy = value,
+                        ),
+                      ),
+                      _buildExtraFieldTile(
+                        label: 'Monitor',
+                        value: task.monitor,
+                        icon: Icons.desktop_windows_outlined,
+                        onTap: (buttonContext) => _editExtraField(
+                          buttonContext,
+                          'Monitor',
+                          task.monitor,
+                          (value) => task.monitor = value,
+                        ),
+                      ),
+                      Builder(
+                        builder: (buttonContext) => _animatedBorderedTile(
+                          isSelected: _isSelected(task.folder),
+                          child: ListTile(
+                            leading: const Icon(
+                              Icons.folder_outlined,
+                              color: secondaryColor,
+                            ),
+                            title: const Text("Folder"),
+                            trailing: _infoTrailing(task.folder),
+                            onTap: () => _showOverlay(
+                              buttonContext,
+                              FloatingSheetType.folder,
+                              fieldKey: 'folder',
+                            ),
+                          ),
+                        ),
+                      ),
+                      _buildExtraFieldTile(
+                        label: 'Remark',
+                        value: task.remark,
+                        icon: Icons.notes,
+                        onTap: (buttonContext) => _editExtraField(
+                          buttonContext,
+                          'Remark',
+                          task.remark,
+                          (value) => task.remark = value,
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      const Text(
+                        "Add note",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _noteController,
+                        maxLines: 12,
+                        onChanged: (value) {
+                          task.note = value;
+                          widget.onChanged();
+                        },
+                        decoration: const InputDecoration(
+                          hintText: "Add note",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 12),
 
@@ -1204,12 +1368,29 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     if (task.createdBy != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          "Created By: ${task.createdBy!['name'] ?? task.createdBy!['email'] ?? 'Unknown'}",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
+                        child: FutureBuilder<String?>(
+                          future: _createdByNameFuture ??= _loadCreatorName(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              debugPrint(
+                                'Could not load task creator name: ${snapshot.error}',
+                              );
+                            }
+                            final metadataName = _metadataCreatorName();
+                            final emailName = _creatorEmailName();
+                            final name =
+                                snapshot.data ??
+                                metadataName ??
+                                emailName ??
+                                'Unknown';
+                            return Text(
+                              "Created By: $name",
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            );
+                          },
                         ),
                       ),
                     if (task.editedBy != null)
@@ -1225,54 +1406,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       ),
 
                     const SizedBox(height: 15),
-
-                    const Text(
-                      "Add note",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _noteController,
-                      maxLines: 12,
-                      onChanged: (value) {
-                        task.note = value;
-                        widget.onChanged();
-                      },
-                      decoration: const InputDecoration(
-                        hintText: "Add note",
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    // ── Created + delete ─────────────────────────────
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "Created: ${task.createdDate}",
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
-                            fontSize: 14,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.brown,
-                            size: 28,
-                          ),
-                          onPressed: () {
-                            widget.onDelete();
-                            context.pop();
-                          },
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -1283,163 +1416,154 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     );
   }
 
-  // 🚀 NAYA: Helper for Extra Fields (Inline editing)
-  Widget _buildExtraFieldRow(
+  Widget _buildExtraFieldTile({
+    required String label,
+    required String? value,
+    required IconData icon,
+    required Future<void> Function(BuildContext) onTap,
+  }) {
+    return Builder(
+      builder: (buttonContext) => _animatedBorderedTile(
+        isSelected: _isSelected(value),
+        child: ListTile(
+          leading: Icon(icon, color: secondaryColor),
+          title: Text(label),
+          trailing: _infoTrailing(value),
+          onTap: () => onTap(buttonContext),
+        ),
+      ),
+    );
+  }
+
+  String? _metadataCreatorName() {
+    final metadata = task.createdBy;
+    if (metadata == null) return null;
+    for (final key in [
+      'name',
+      'displayName',
+      'fullName',
+      'userName',
+      'cpName',
+    ]) {
+      final value = metadata[key]?.toString().trim();
+      if (value != null &&
+          value.isNotEmpty &&
+          value.toLowerCase() != 'user' &&
+          value.toLowerCase() != 'unknown') {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  String? _creatorEmailName() {
+    final email = task.createdBy?['email']?.toString().trim() ?? '';
+    if (email.isEmpty) return null;
+    return email.contains('@') ? email.split('@').first : email;
+  }
+
+  Future<String?> _loadCreatorName() async {
+    if (_metadataCreatorName() != null) return _metadataCreatorName();
+
+    final metadata = task.createdBy;
+    if (metadata == null) return null;
+    final uid = metadata['uid']?.toString().trim() ?? '';
+    final email = metadata['email']?.toString().trim() ?? '';
+    final users = FirebaseFirestore.instance.collection('users');
+
+    if (uid.isNotEmpty) {
+      final profile = await users.where('uid', isEqualTo: uid).limit(1).get();
+      if (profile.docs.isNotEmpty) {
+        final profileName = _profileName(profile.docs.first.data());
+        if (profileName != null) return profileName;
+      }
+
+      final profileById = await users.doc(uid).get();
+      final profileName = _profileName(profileById.data());
+      if (profileName != null) return profileName;
+    }
+
+    if (email.isNotEmpty) {
+      final profile = await users
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+      if (profile.docs.isNotEmpty) {
+        return _profileName(profile.docs.first.data());
+      }
+    }
+    return null;
+  }
+
+  String? _profileName(Map<String, dynamic>? profile) {
+    if (profile == null) return null;
+    for (final key in [
+      'name',
+      'displayName',
+      'fullName',
+      'userName',
+      'cpName',
+    ]) {
+      final value = profile[key]?.toString().trim();
+      if (value != null &&
+          value.isNotEmpty &&
+          value.toLowerCase() != 'user' &&
+          value.toLowerCase() != 'unknown') {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _pickExtraTime(
+    BuildContext buttonContext,
+    void Function(String) onChanged,
+  ) async {
+    final time = await showTimePicker(
+      context: buttonContext,
+      initialTime: TimeOfDay.now(),
+    );
+    if (time == null || !mounted) return;
+    setState(() => onChanged(time.format(context)));
+    widget.onChanged();
+  }
+
+  Future<void> _editExtraField(
+    BuildContext buttonContext,
     String label,
     String? value,
-    Function(String) onChanged, {
-    bool isTime = false,
-  }) {
-    final TextEditingController ctrl = TextEditingController(text: value);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-                color: secondaryColor,
-              ),
-            ),
+    void Function(String) onChanged,
+  ) async {
+    final controller = TextEditingController(text: value);
+    final updatedValue = await showDialog<String>(
+      context: buttonContext,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(label),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: label == 'Remark' ? 3 : 1,
+          decoration: InputDecoration(hintText: 'Enter $label'),
+          textInputAction: label == 'Remark'
+              ? TextInputAction.newline
+              : TextInputAction.done,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
           ),
-          Expanded(
-            flex: 4,
-            child: isTime
-                ? InkWell(
-                    onTap: () async {
-                      final time = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.now(),
-                      );
-                      if (time != null && mounted) {
-                        onChanged(time.format(context));
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        value?.isNotEmpty == true ? value! : 'Set time',
-                        style: TextStyle(
-                          color: value?.isNotEmpty == true
-                              ? Colors.black87
-                              : Colors.grey,
-                        ),
-                      ),
-                    ),
-                  )
-                : Focus(
-                    onFocusChange: (hasFocus) {
-                      if (!hasFocus) {
-                        onChanged(ctrl.text.trim());
-                      }
-                    },
-                    child: TextField(
-                      controller: ctrl,
-                      style: const TextStyle(fontSize: 13),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        hintText: 'Enter $label',
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      onSubmitted: (val) {
-                        onChanged(val.trim());
-                      },
-                    ),
-                  ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Save'),
           ),
         ],
       ),
     );
+    controller.dispose();
+    if (updatedValue == null || !mounted) return;
+    setState(() => onChanged(updatedValue));
+    widget.onChanged();
   }
-
-  Widget _buildAddButton(
-    BuildContext context, {
-    required String label,
-    required IconData icon,
-    required void Function(BuildContext) onTap,
-  }) {
-    return InkWell(
-      onTap: () => onTap(context),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: Colors.grey.shade700),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey.shade700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required void Function(BuildContext) onTap,
-  }) {
-    return InkWell(
-      onTap: () => onTap(context),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: secondaryColor),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: secondaryColor),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: secondaryColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Removed duplicates.
 }

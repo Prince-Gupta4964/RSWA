@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/task.dart';
+import '../../utils/task_title_formatter.dart';
 import 'task_metadata_badges.dart';
 
 class TaskTile extends StatelessWidget {
@@ -9,6 +10,8 @@ class TaskTile extends StatelessWidget {
     required this.task,
     required this.isSelected,
     this.dense = false,
+    this.showMetadata = false,
+    this.taskNameMaxLines = 1,
     required this.taskName,
     required this.description,
     required this.priorityWidget,
@@ -21,6 +24,8 @@ class TaskTile extends StatelessWidget {
   final Task task;
   final bool isSelected;
   final bool dense;
+  final bool showMetadata;
+  final int? taskNameMaxLines;
   final String taskName;
   final String? description;
   final Widget priorityWidget;
@@ -32,7 +37,7 @@ class TaskTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: EdgeInsets.symmetric(
-      horizontal: dense ? 8 : 12,
+      horizontal: dense ? 2 : 4,
       vertical: dense ? 0 : 2,
     ),
     child: InkWell(
@@ -45,10 +50,7 @@ class TaskTile extends StatelessWidget {
               : Colors.white,
           borderRadius: BorderRadius.circular(8),
         ),
-        padding: EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: dense ? 5 : 8,
-        ),
+        padding: EdgeInsets.symmetric(horizontal: 0, vertical: dense ? 5 : 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -77,9 +79,13 @@ class TaskTile extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    taskName,
+                    capitalizeFirstCharacter(taskName),
+                    maxLines: taskNameMaxLines,
+                    overflow: taskNameMaxLines == null
+                        ? null
+                        : TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: dense ? 13 : 15,
+                      fontSize: dense ? 14 : 16,
                       fontWeight: FontWeight.w600,
                       color: const Color(0xFF26364A),
                       decoration: task.isDone
@@ -96,7 +102,7 @@ class TaskTile extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: dense ? 10 : 12,
+                          fontSize: 12,
                           height: 1.25,
                           color: task.isDone
                               ? Colors.grey.shade500
@@ -104,9 +110,10 @@ class TaskTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                  if (task.assignee?.trim().isNotEmpty == true ||
-                      task.workType?.trim().isNotEmpty == true ||
-                      task.clientName?.trim().isNotEmpty == true)
+                  if (showMetadata &&
+                      (task.assignee?.trim().isNotEmpty == true ||
+                          task.workType?.trim().isNotEmpty == true ||
+                          task.clientName?.trim().isNotEmpty == true))
                     Padding(
                       padding: EdgeInsets.only(top: dense ? 1 : 3),
                       child: TaskMetadataBadges(task: task, compact: true),
@@ -121,7 +128,7 @@ class TaskTile extends StatelessWidget {
                 Row(
                   children: [
                     priorityWidget,
-                    SizedBox(width: dense ? 4 : 8),
+                    SizedBox(width: dense ? 14 : 18),
                     InkWell(
                       onTap: onAddSubtask,
                       borderRadius: BorderRadius.circular(20),

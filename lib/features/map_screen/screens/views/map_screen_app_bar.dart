@@ -26,7 +26,7 @@ class MapScreenAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onDeleteSelected;
   final VoidCallback onToggleSearch;
   final VoidCallback onOpenNotifications;
-  final VoidCallback onOpenMoreOptions;
+  final ValueChanged<BuildContext> onOpenMoreOptions;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -53,10 +53,7 @@ class MapScreenAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(
-              Icons.delete_outline,
-              color: Colors.redAccent,
-            ),
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
             onPressed: onDeleteSelected,
           ),
           const SizedBox(width: 8),
@@ -102,10 +99,15 @@ class MapScreenAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           onPressed: onToggleSearch,
         ),
-        IconButton(
-          tooltip: 'More options',
-          icon: const Icon(Icons.more_vert, color: TaskConstants.secondaryColor),
-          onPressed: onOpenMoreOptions,
+        Builder(
+          builder: (buttonContext) => IconButton(
+            tooltip: 'More options',
+            icon: const Icon(
+              Icons.more_vert,
+              color: TaskConstants.secondaryColor,
+            ),
+            onPressed: () => onOpenMoreOptions(buttonContext),
+          ),
         ),
         const SizedBox(width: 4),
       ],

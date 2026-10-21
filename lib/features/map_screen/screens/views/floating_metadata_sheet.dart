@@ -6,11 +6,13 @@ import '../../models/floating_sheet_type.dart';
 import '../../models/quick_date_time_option.dart';
 import '../../utils/task_constants.dart';
 import '../../utils/task_mention_parser.dart';
+import '../../../flash/flash_alert_service.dart';
 import 'date_time_picker_dialog.dart';
 
 class FloatingMetadataSheet {
   static OverlayEntry? _currentOverlay;
-  static final TextEditingController _searchController = TextEditingController();
+  static final TextEditingController _searchController =
+      TextEditingController();
   static String _searchQuery = '';
 
   static bool get isShowing => _currentOverlay != null;
@@ -37,6 +39,7 @@ class FloatingMetadataSheet {
     Future<List<String>> Function()? loadProjects,
     Future<List<String>> Function()? loadAssignees,
     void Function(String)? onSelected,
+    Future<void> Function()? onFlashMessage,
     VoidCallback? onDone,
     bool Function()? shouldShow,
     String Function()? searchQuery,
@@ -73,20 +76,41 @@ class FloatingMetadataSheet {
     if (!buttonContext.mounted || !context.mounted) return;
     if (shouldShow != null && !shouldShow()) return;
 
-    final BuildContext rootContext =
-        Navigator.of(buttonContext, rootNavigator: true).context;
+    final BuildContext rootContext = Navigator.of(
+      buttonContext,
+      rootNavigator: true,
+    ).context;
     final RenderBox button = buttonContext.findRenderObject() as RenderBox;
     final overlayState = Overlay.of(buttonContext);
     if (!overlayState.mounted) return;
-    final RenderBox overlay = overlayState.context.findRenderObject() as RenderBox;
+    final RenderBox overlay =
+        overlayState.context.findRenderObject() as RenderBox;
+
+    String currentQuery() {
+      final searchText = _searchController.text.trim();
+      final externalQuery = searchQuery?.call().trim() ?? '';
+      return (searchText.isNotEmpty
+              ? searchText
+              : externalQuery.isNotEmpty
+              ? externalQuery
+              : _searchQuery)
+          .trim()
+          .toLowerCase();
+    }
 
     List<Widget> buildOptions(StateSetter? setOverlayState) {
+      final typedQuery = currentQuery();
       List<String> options = [];
       switch (type) {
         case FloatingSheetType.priority:
           options = TaskConstants.priorityOptions;
           break;
         case FloatingSheetType.remind:
+          options = [
+            ...QuickDateTimeOptions.labels(),
+            if (onFlashMessage != null) kFlashOption,
+          ];
+          break;
         case FloatingSheetType.deadline:
           options = QuickDateTimeOptions.labels();
           break;
@@ -107,11 +131,13 @@ class FloatingMetadataSheet {
           break;
       }
 
-      final typedQuery = searchQuery?.call().trim().toLowerCase() ?? '';
       final matchingOptions = typedQuery.isEmpty
           ? const <String>[]
           : options
-                .where((opt) => TaskMentionParser.matchesSearchQuery(opt, typedQuery))
+                .where(
+                  (opt) =>
+                      TaskMentionParser.matchesSearchQuery(opt, typedQuery),
+                )
                 .toList();
       final highlightedOption = matchingOptions.firstWhere(
         (opt) => opt.toLowerCase() == typedQuery,
@@ -128,19 +154,19 @@ class FloatingMetadataSheet {
           selectedTileColor: TaskConstants.primaryColor.withValues(alpha: 0.22),
           leading:
               type == FloatingSheetType.priority ||
-                      type == FloatingSheetType.remind ||
-                      type == FloatingSheetType.deadline
-                  ? Icon(
-                      type == FloatingSheetType.priority
-                          ? Icons.flag
-                          : Icons.access_time,
-                      size: 18,
-                    )
-                  : null,
+                  type == FloatingSheetType.remind ||
+                  type == FloatingSheetType.deadline
+              ? Icon(
+                  type == FloatingSheetType.priority
+                      ? Icons.flag
+                      : Icons.access_time,
+                  size: 18,
+                )
+              : null,
           title: Text(
             opt,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: isSelected || isHighlighted
                   ? FontWeight.bold
                   : FontWeight.normal,
@@ -150,9 +176,20 @@ class FloatingMetadataSheet {
             ),
           ),
           trailing: isSelected
-              ? const Icon(Icons.check, size: 16, color: TaskConstants.secondaryColor)
+              ? const Icon(
+                  Icons.check,
+                  size: 16,
+                  color: TaskConstants.secondaryColor,
+                )
               : null,
           onTap: () async {
+            if (type == FloatingSheetType.remind &&
+                opt == kFlashOption &&
+                onFlashMessage != null) {
+              hide();
+              await onFlashMessage();
+              return;
+            }
             final now = DateTime.now();
             final lower = opt.toLowerCase();
             String finalVal = opt;
@@ -176,8 +213,6 @@ class FloatingMetadataSheet {
             if (onSelected != null) onSelected(finalVal);
 
             if (!multiSelect || closeOnSelect) {
-              _searchController.clear();
-              _searchQuery = '';
               hide();
               if (closeOnSelect) onDone?.call();
             } else {
@@ -249,7 +284,10 @@ class FloatingMetadataSheet {
               ),
               Positioned(
                 right: padding,
-                top: top,
+                top: openAbove ? null : top,
+                bottom: openAbove
+                    ? constraints.maxHeight - currentButtonPosition.dy + padding
+                    : null,
                 child: Material(
                   color: Colors.white,
                   elevation: 8,
@@ -260,14 +298,15 @@ class FloatingMetadataSheet {
                       builder: (context, setOverlayState) {
                         const showSearch = true;
                         final allOptions = buildOptions(setOverlayState);
+                        final typedQuery = currentQuery();
                         final filteredOptions =
-                            showSearch && _searchQuery.isNotEmpty
+                            showSearch && typedQuery.isNotEmpty
                             ? allOptions.where((tile) {
                                 final title =
                                     ((tile as ListTile).title as Text).data!;
                                 return TaskMentionParser.matchesSearchQuery(
                                   title,
-                                  _searchQuery,
+                                  typedQuery,
                                 );
                               }).toList()
                             : allOptions;
@@ -297,13 +336,11 @@ class FloatingMetadataSheet {
                                     padding: const EdgeInsets.all(10),
                                     child: TextField(
                                       controller: _searchController,
-                                      autofocus:
-                                          compactWeb &&
-                                          type == FloatingSheetType.assign,
+                                      autofocus: false,
                                       decoration: InputDecoration(
                                         hintText: 'Search...',
                                         hintStyle: TextStyle(
-                                          fontSize: 13,
+                                          fontSize: 14,
                                           color: Colors.grey.shade400,
                                         ),
                                         prefixIcon: Icon(
@@ -342,7 +379,7 @@ class FloatingMetadataSheet {
                                           child: Text(
                                             'No results',
                                             style: TextStyle(
-                                              fontSize: 13,
+                                              fontSize: 14,
                                               color: Colors.grey,
                                             ),
                                           ),

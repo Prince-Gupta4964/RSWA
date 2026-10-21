@@ -232,8 +232,6 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
     try {
       selectedData = await ContactPickerService.pickContacts(
         context: context,
-        cpVM: cpVM,
-        authVM: authVM,
         multiple: true,
       );
     } catch (e) {
@@ -243,7 +241,7 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
-          builder: (context) => ContactPickerSheet(cpVM: cpVM, authVM: authVM),
+          builder: (context) => const ContactPickerSheet(),
         );
         if (manualData != null && manualData.isNotEmpty) {
           selectedData = manualData;

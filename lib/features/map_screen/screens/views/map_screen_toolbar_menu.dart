@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
-import '../../../../../services/home_screen_shortcut.dart';
+import '../../../../services/home_screen_shortcut.dart';
 import '../../models/task.dart';
 import '../../services/task_share_print_service.dart';
 import '../../viewmodels/map_screen_viewmodel.dart';
@@ -11,64 +11,84 @@ import '../dialogs/task_zoom_dialog.dart';
 class MapScreenToolbarMenu {
   static Future<void> show({
     required BuildContext context,
+    required BuildContext anchorContext,
     required MapScreenViewModel viewModel,
     required TabController tabController,
     required String screenTitle,
     required List<Task> currentTabTasks,
     required void Function(String message) onShowMessage,
   }) async {
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 168),
-          child: ListView(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.sort),
-                title: const Text('Sort by'),
-                subtitle: Text(viewModel.sortBy),
-                onTap: () => Navigator.pop(ctx, 'sort'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.group_work_outlined),
-                title: const Text('Group by'),
-                subtitle: Text(viewModel.groupBy),
-                onTap: () => Navigator.pop(ctx, 'group'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.view_quilt_outlined),
-                title: const Text('View type'),
-                subtitle: Text(viewModel.viewType),
-                onTap: () => Navigator.pop(ctx, 'view'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.zoom_in),
-                title: const Text('Adjust zoom'),
-                subtitle: Text('${(viewModel.zoom * 100).round()}%'),
-                onTap: () => Navigator.pop(ctx, 'zoom'),
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.add_to_home_screen),
-                title: const Text('Add shortcut to home screen'),
-                onTap: () => Navigator.pop(ctx, 'shortcut'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.share_outlined),
-                title: const Text('Share list'),
-                onTap: () => Navigator.pop(ctx, 'share'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.print_outlined),
-                title: const Text('Print list'),
-                onTap: () => Navigator.pop(ctx, 'print'),
-              ),
-            ],
-          ),
-        ),
+    final buttonBox = anchorContext.findRenderObject()! as RenderBox;
+    final overlayBox =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final buttonTopLeft = buttonBox.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final buttonBottomRight = buttonBox.localToGlobal(
+      buttonBox.size.bottomRight(Offset.zero),
+      ancestor: overlayBox,
+    );
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        buttonTopLeft.translate(0, buttonBox.size.height + 12),
+        buttonBottomRight.translate(0, buttonBox.size.height + 12),
       ),
+      Offset.zero & overlayBox.size,
+    );
+
+    final action = await showMenu<String>(
+      context: context,
+      position: position,
+      constraints: const BoxConstraints(maxHeight: 196, maxWidth: 190),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 8,
+      surfaceTintColor: Colors.transparent,
+      color: Colors.white,
+      items: [
+        _menuItem(
+          icon: Icons.sort,
+          title: 'Sort by',
+          subtitle: viewModel.sortBy,
+          value: 'sort',
+        ),
+        _menuItem(
+          icon: Icons.group_work_outlined,
+          title: 'Group by',
+          subtitle: viewModel.groupBy,
+          value: 'group',
+        ),
+        _menuItem(
+          icon: Icons.view_quilt_outlined,
+          title: 'View type',
+          subtitle: tabController.index == 0
+              ? viewModel.myDayViewType
+              : viewModel.viewType,
+          value: 'view',
+        ),
+        _menuItem(
+          icon: Icons.zoom_in,
+          title: 'Adjust zoom',
+          subtitle: '${(viewModel.zoom * 100).round()}%',
+          value: 'zoom',
+        ),
+        const PopupMenuDivider(),
+        _menuItem(
+          icon: Icons.add_to_home_screen,
+          title: 'Add shortcut to home screen',
+          value: 'shortcut',
+        ),
+        _menuItem(
+          icon: Icons.share_outlined,
+          title: 'Share list',
+          value: 'share',
+        ),
+        _menuItem(
+          icon: Icons.print_outlined,
+          title: 'Print list',
+          value: 'print',
+        ),
+      ],
     );
 
     if (!context.mounted || action == null) return;
@@ -91,17 +111,33 @@ class MapScreenToolbarMenu {
           selected: viewModel.groupBy,
           onSelected: (value) {
             viewModel.setGroupBy(value);
-            tabController.animateTo(6);
+            if (tabController.length > 5) {
+              tabController.animateTo(tabController.length - 1);
+            }
           },
         );
         break;
       case 'view':
+        final isMyDay = tabController.index == 0;
         await chooseTaskOptionDialog(
           context: context,
           title: 'View type',
-          options: const ['Grid', 'List', 'Detailed list', 'Calendar'],
-          selected: viewModel.viewType,
-          onSelected: viewModel.setViewType,
+          options: isMyDay
+              ? const [
+                  'Grid',
+                  'List',
+                  'Detailed list',
+                  'Calendar',
+                  'Day',
+                  '3 Day',
+                  'Week',
+                  'Month',
+                ]
+              : const ['Grid', 'List', 'Detailed list', 'Calendar'],
+          selected: isMyDay ? viewModel.myDayViewType : viewModel.viewType,
+          onSelected: isMyDay
+              ? viewModel.setMyDayViewType
+              : viewModel.setViewType,
         );
         break;
       case 'zoom':
@@ -132,5 +168,39 @@ class MapScreenToolbarMenu {
         await service.printTasks(screenTitle, currentTabTasks);
         break;
     }
+  }
+
+  static PopupMenuItem<String> _menuItem({
+    required IconData icon,
+    required String title,
+    required String value,
+    String? subtitle,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: subtitle == null ? 48 : 60,
+      child: Row(
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

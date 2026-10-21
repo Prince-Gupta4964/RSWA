@@ -11,6 +11,7 @@ class CompactTaskTile extends StatelessWidget {
     required this.description,
     required this.isSelected,
     this.dense = false,
+    this.showMetadata = false,
     required this.priorityBadge,
     required this.onToggleDone,
     required this.onAddSubtask,
@@ -23,6 +24,7 @@ class CompactTaskTile extends StatelessWidget {
   final String? description;
   final bool isSelected;
   final bool dense;
+  final bool showMetadata;
   final Widget priorityBadge;
   final VoidCallback onToggleDone;
   final VoidCallback onAddSubtask;
@@ -32,9 +34,10 @@ class CompactTaskTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasMetadata =
-        task.assignee?.trim().isNotEmpty == true ||
-        task.workType?.trim().isNotEmpty == true ||
-        task.clientName?.trim().isNotEmpty == true;
+        showMetadata &&
+        (task.assignee?.trim().isNotEmpty == true ||
+            task.workType?.trim().isNotEmpty == true ||
+            task.clientName?.trim().isNotEmpty == true);
     return ListTile(
       dense: true,
       visualDensity: dense
@@ -52,7 +55,7 @@ class CompactTaskTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontSize: dense ? 13 : 15,
+          fontSize: dense ? 14 : 16,
           fontWeight: FontWeight.w600,
           color: const Color(0xFF26364A),
           decoration: task.isDone ? TextDecoration.lineThrough : null,
@@ -70,7 +73,7 @@ class CompactTaskTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: dense ? 10 : 12,
+                      fontSize: 12,
                       color: Colors.blueGrey.shade500,
                       height: 1.25,
                     ),
@@ -86,6 +89,7 @@ class CompactTaskTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           priorityBadge,
+          SizedBox(width: dense ? 10 : 14),
           IconButton(
             tooltip: 'Add subtask',
             visualDensity: VisualDensity.compact,

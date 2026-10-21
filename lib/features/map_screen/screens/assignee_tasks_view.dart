@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../models/task.dart';
 import '../viewmodels/map_screen_viewmodel.dart';
 import 'views/my_work_view.dart';
+import 'widgets/task_metadata_badges.dart';
 
 class AssigneeTasksView extends StatelessWidget {
   final String assigneeName;
   final List<Task> tasks;
+  final ValueChanged<Task> onOpenTask;
 
   const AssigneeTasksView({
     super.key,
     required this.assigneeName,
     required this.tasks,
+    required this.onOpenTask,
   });
 
   static const Color primaryColor = Color(0xFFFBE64E);
@@ -38,7 +40,7 @@ class AssigneeTasksView extends StatelessWidget {
               style: const TextStyle(
                 color: secondaryColor,
                 fontWeight: FontWeight.bold,
-                fontSize: 18,
+                fontSize: 16,
               ),
             ),
             Text(
@@ -55,9 +57,14 @@ class AssigneeTasksView extends StatelessWidget {
           children: [
             for (final task in sectionTasks)
               ListTile(
+                dense: true,
+                visualDensity: const VisualDensity(
+                  horizontal: -1,
+                  vertical: -1,
+                ),
                 contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+                  horizontal: 8,
+                  vertical: 0,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -71,29 +78,45 @@ class AssigneeTasksView extends StatelessWidget {
                 ),
                 title: Text(
                   task.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                    fontSize: 14,
                     decoration: task.isDone ? TextDecoration.lineThrough : null,
                     color: task.isDone ? Colors.grey : Colors.black87,
                   ),
                 ),
-                subtitle: task.workType?.trim().isNotEmpty == true
-                    ? Text(
-                        'Work Type: ${task.workType}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
+                subtitle:
+                    task.note.trim().isNotEmpty ||
+                        task.assignee?.trim().isNotEmpty == true ||
+                        task.clientName?.trim().isNotEmpty == true ||
+                        task.workType?.trim().isNotEmpty == true
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (task.note.trim().isNotEmpty)
+                            Text(
+                              task.note.trim(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          if (task.assignee?.trim().isNotEmpty == true ||
+                              task.clientName?.trim().isNotEmpty == true ||
+                              task.workType?.trim().isNotEmpty == true)
+                            TaskMetadataBadges(task: task, compact: true),
+                        ],
                       )
                     : null,
                 trailing: const Icon(
                   Icons.chevron_right_rounded,
                   color: secondaryColor,
                 ),
-                onTap: () {
-                  context.push('/task', extra: task);
-                },
+                onTap: () => onOpenTask(task),
               ),
           ],
         ),

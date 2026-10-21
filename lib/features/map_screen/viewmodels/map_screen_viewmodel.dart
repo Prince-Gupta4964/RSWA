@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../../services/task_home_widget_service.dart';
+import '../../../services/task_home_widget_service.dart';
 import '../../../utils/role_permissions.dart';
 import '../../../viewmodels/auth_viewmodel.dart';
 import '../models/task.dart';
@@ -22,6 +22,7 @@ class MapScreenViewModel extends ChangeNotifier {
   final List<Task> _tasks = [];
   final Set<Task> _pendingTasks = {};
   final Set<Task> _selectedTasks = {};
+  final Map<Task, Future<void>> _pendingTaskSaves = {};
 
   StreamSubscription<List<Task>>? _tasksSubscription;
   bool _isAddingTask = false;
@@ -33,6 +34,7 @@ class MapScreenViewModel extends ChangeNotifier {
   String _viewType = 'Detailed list';
   double _zoom = 1.0;
   DateTime _calendarDate = DateTime.now();
+  String _myDayViewType = 'Day';
   String _taskSearchQuery = '';
   bool _isSearchVisible = false;
 
@@ -97,6 +99,12 @@ class MapScreenViewModel extends ChangeNotifier {
   DateTime get calendarDate => _calendarDate;
   void setCalendarDate(DateTime value) {
     _calendarDate = value;
+    notifyListeners();
+  }
+
+  String get myDayViewType => _myDayViewType;
+  void setMyDayViewType(String value) {
+    _myDayViewType = value;
     notifyListeners();
   }
 
@@ -188,6 +196,7 @@ class MapScreenViewModel extends ChangeNotifier {
   Future<bool> addTask({
     required String title,
     required AuthViewModel authViewModel,
+    Future<void> Function(Task task)? onTaskSaved,
     String? priority,
     String? reminder,
     String? assignee,
@@ -233,7 +242,9 @@ class MapScreenViewModel extends ChangeNotifier {
         _sendAssignmentNotification(assignee, cleanTitle, authViewModel),
       );
     }
-    unawaited(_saveNewTask(task));
+    final saveOperation = _saveNewTask(task, onTaskSaved);
+    _pendingTaskSaves[task] = saveOperation;
+    unawaited(saveOperation);
     _isAddingTask = false;
     notifyListeners();
     return true;
@@ -245,8 +256,26 @@ class MapScreenViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> addTaskToMyDay(Task task) async {
+    if (task.isInMyDay) return;
+    task.isInMyDay = true;
+    notifyListeners();
+    try {
+      await updateTask(task);
+    } catch (error) {
+      debugPrint('Error adding task to My Day: $error');
+      task.isInMyDay = false;
+      _lastErrorMessage =
+          'Could not add "${task.title}" to My Day. Please try again.';
+      notifyListeners();
+    }
+  }
+
   Future<void> toggleTaskDone(Task task) async {
     task.isDone = !task.isDone;
+    task.completedAt = task.isDone
+        ? DateTime.now().millisecondsSinceEpoch
+        : null;
     await updateTask(task);
     sortTasks();
   }
@@ -259,10 +288,26 @@ class MapScreenViewModel extends ChangeNotifier {
   }
 
   Future<void> addSubstep(Task task, String title) async {
-    if (title.trim().isEmpty) return;
-    task.steps.add(TaskStep(title: title.trim()));
-    await updateTask(task);
-    sortTasks();
+    final cleanTitle = title.trim();
+    if (cleanTitle.isEmpty) return;
+    final step = TaskStep(title: cleanTitle);
+    task.steps.add(step);
+    notifyListeners();
+    try {
+      final pendingSave = _pendingTaskSaves[task];
+      if (pendingSave != null) await pendingSave;
+      if (task.id == null) {
+        throw StateError('Task has not been saved yet.');
+      }
+      await updateTask(task);
+      sortTasks();
+    } catch (error) {
+      task.steps.remove(step);
+      debugPrint('Error saving substep for "${task.title}": $error');
+      _lastErrorMessage =
+          'Could not save "$cleanTitle" under "${task.title}". Please try again.';
+      notifyListeners();
+    }
   }
 
   Future<void> deleteTask(Task task) async {
@@ -279,12 +324,17 @@ class MapScreenViewModel extends ChangeNotifier {
   Future<List<String>> loadProjects() => _repository.loadProjects();
 
   void sortTasks() {
-    _tasks.sort(compareTasks);
+    _tasks.sort(MapScreenViewModel.compareTasks);
     notifyListeners();
   }
 
-  int compareTasks(Task first, Task second) {
+  static int compareTasks(Task first, Task second) {
     if (first.isDone != second.isDone) return first.isDone ? 1 : -1;
+    if (first.isDone && first.completedAt != second.completedAt) {
+      if (first.completedAt == null) return 1;
+      if (second.completedAt == null) return -1;
+      return second.completedAt!.compareTo(first.completedAt!);
+    }
     final firstPriority = _priorityOrder(first.priority);
     final secondPriority = _priorityOrder(second.priority);
     if (firstPriority != secondPriority) {
@@ -312,19 +362,23 @@ class MapScreenViewModel extends ChangeNotifier {
 
   List<Task> upcomingReminders() {
     final now = DateTime.now();
-    final reminders = _tasks.where((task) {
-      if (task.isDone) return false;
-      final scheduled = DateTime.tryParse(task.deadline ?? task.reminder ?? '');
-      return scheduled != null &&
-          scheduled.isAfter(now.subtract(const Duration(days: 1)));
-    }).toList()
-      ..sort((a, b) {
-        final dateA = DateTime.tryParse(a.deadline ?? a.reminder ?? '') ??
-            DateTime(2100);
-        final dateB = DateTime.tryParse(b.deadline ?? b.reminder ?? '') ??
-            DateTime(2100);
-        return dateA.compareTo(dateB);
-      });
+    final reminders =
+        _tasks.where((task) {
+          if (task.isDone) return false;
+          final scheduled = DateTime.tryParse(
+            task.deadline ?? task.reminder ?? '',
+          );
+          return scheduled != null &&
+              scheduled.isAfter(now.subtract(const Duration(days: 1)));
+        }).toList()..sort((a, b) {
+          final dateA =
+              DateTime.tryParse(a.deadline ?? a.reminder ?? '') ??
+              DateTime(2100);
+          final dateB =
+              DateTime.tryParse(b.deadline ?? b.reminder ?? '') ??
+              DateTime(2100);
+          return dateA.compareTo(dateB);
+        });
     return reminders;
   }
 
@@ -378,13 +432,17 @@ class MapScreenViewModel extends ChangeNotifier {
     );
     return source.where((task) {
       if (task.isDone) return false;
+      if (task.isInMyDay) return true;
       if (task.priority?.trim().toLowerCase() == 'today') return true;
 
       final scheduled = DateTime.tryParse(task.deadline ?? task.reminder ?? '');
-      return scheduled != null &&
-          scheduled.year == today.year &&
-          scheduled.month == today.month &&
-          scheduled.day == today.day;
+      if (scheduled == null) return false;
+      final scheduledDate = DateTime(
+        scheduled.year,
+        scheduled.month,
+        scheduled.day,
+      );
+      return !scheduledDate.isAfter(today);
     }).toList();
   }
 
@@ -395,10 +453,24 @@ class MapScreenViewModel extends ChangeNotifier {
   }
 
   List<Task> myTasks(AuthViewModel authViewModel) {
-    final myUid = authViewModel.userUid.trim().toLowerCase();
-    final myEmail = authViewModel.userEmail.trim().toLowerCase();
-    final myName = authViewModel.userName.trim().toLowerCase();
-    return _tasks.where((task) {
+    return myTasksForUser(
+      _tasks,
+      userUid: authViewModel.userUid,
+      userEmail: authViewModel.userEmail,
+      userName: authViewModel.userName,
+    );
+  }
+
+  static List<Task> myTasksForUser(
+    Iterable<Task> tasks, {
+    required String userUid,
+    required String userEmail,
+    required String userName,
+  }) {
+    final myUid = userUid.trim().toLowerCase();
+    final myEmail = userEmail.trim().toLowerCase();
+    final myName = userName.trim().toLowerCase();
+    return tasks.where((task) {
       final creator = task.createdBy;
       var isCreator = false;
       if (creator != null) {
@@ -412,12 +484,13 @@ class MapScreenViewModel extends ChangeNotifier {
             (name.isNotEmpty && (name == myName || myName.contains(name)));
       }
       final assignee = (task.assignee ?? '').trim().toLowerCase();
-      final isAssignee =
-          assignee.isNotEmpty &&
-          ((myName.isNotEmpty && assignee.contains(myName)) ||
-              (myEmail.isNotEmpty && assignee.contains(myEmail)) ||
-              (myUid.isNotEmpty && assignee.contains(myUid)));
-      return isCreator || isAssignee;
+      final assigneeUid = (task.assigneeUid ?? '').trim().toLowerCase();
+      final isAssignedToMe =
+          (myName.isNotEmpty && assignee.contains(myName)) ||
+          (myEmail.isNotEmpty && assignee.contains(myEmail)) ||
+          (myUid.isNotEmpty &&
+              (assignee.contains(myUid) || assigneeUid.contains(myUid)));
+      return isCreator || isAssignedToMe;
     }).toList();
   }
 
@@ -429,6 +502,19 @@ class MapScreenViewModel extends ChangeNotifier {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final pending = myTasks.where((task) => !task.isDone);
+    List<Task> withPriority(String priority) => pending
+        .where((task) => task.priority?.trim().toLowerCase() == priority)
+        .toList();
+    final urgentWorks = pending
+        .where(
+          (task) => const {
+            'u1',
+            'u2',
+            'u3',
+            'urgent',
+          }.contains(task.priority?.trim().toLowerCase()),
+        )
+        .toList();
     final scheduled = pending
         .where((task) => task.priority?.trim().isEmpty ?? true)
         .map(
@@ -449,6 +535,14 @@ class MapScreenViewModel extends ChangeNotifier {
         (task) => task.priority?.trim().toLowerCase() == 'today',
       ),
     }.toList();
+    final overdueWorks = pending.where((task) {
+      final date = DateTime.tryParse(task.deadline ?? task.reminder ?? '');
+      return date != null &&
+          date.isBefore(now) &&
+          !urgentWorks.contains(task) &&
+          !todayWorks.contains(task);
+    }).toList();
+    bool isOverdue(Task task) => overdueWorks.contains(task);
     final tomorrow = DateTime(now.year, now.month, now.day + 1);
     final tomorrowWorks = <Task>{
       ...scheduled
@@ -462,28 +556,27 @@ class MapScreenViewModel extends ChangeNotifier {
       ...pending.where(
         (task) => task.priority?.trim().toLowerCase() == 'tomorrow',
       ),
-    }.toList();
-    List<Task> withPriority(String priority) => pending
-        .where((task) => task.priority?.trim().toLowerCase() == priority)
-        .toList();
+    }.where((task) => !isOverdue(task)).toList();
     return {
-      'Urgent Works': pending
-          .where(
-            (task) => const {
-              'u1',
-              'u2',
-              'u3',
-              'urgent',
-            }.contains(task.priority?.trim().toLowerCase()),
-          )
-          .toList(),
-      'IMP Works': withPriority('imp'),
+      'Urgent Works': urgentWorks,
       'Today Works': todayWorks,
+      'Overdue Works': overdueWorks,
+      'IMP Works': withPriority('imp')
+          .where((task) => !isOverdue(task))
+          .toList(),
       'Tomorrow Works': tomorrowWorks,
-      'Day Later Works': withPriority('day later'),
-      'Later Works': withPriority('later'),
-      'Process Works': withPriority('process'),
-      'Hold Works': withPriority('hold'),
+      'Later Works': withPriority('later')
+          .where((task) => !isOverdue(task))
+          .toList(),
+      'Day Later Works': withPriority('day later')
+          .where((task) => !isOverdue(task))
+          .toList(),
+      'Process Works': withPriority('process')
+          .where((task) => !isOverdue(task))
+          .toList(),
+      'Hold Works': withPriority('hold')
+          .where((task) => !isOverdue(task))
+          .toList(),
     };
   }
 
@@ -532,15 +625,28 @@ class MapScreenViewModel extends ChangeNotifier {
               : (first.isDone ? 1 : -1),
         );
       default:
-        result.sort(compareTasks);
+        result.sort(MapScreenViewModel.compareTasks);
     }
     return result;
   }
 
-  Future<void> _saveNewTask(Task task) async {
+  Future<void> _saveNewTask(
+    Task task,
+    Future<void> Function(Task task)? onTaskSaved,
+  ) async {
     try {
       await _repository.addTask(task);
       _pendingTasks.remove(task);
+      if (onTaskSaved != null) {
+        try {
+          await onTaskSaved(task);
+        } catch (error) {
+          debugPrint('Error sending scheduled flash message: $error');
+          _lastErrorMessage =
+              'Task saved, but its scheduled flash message could not be set.';
+          notifyListeners();
+        }
+      }
       await _updateHomeWidgetSafely();
     } catch (error) {
       debugPrint('Error adding task: $error');
@@ -552,6 +658,8 @@ class MapScreenViewModel extends ChangeNotifier {
       );
       _lastErrorMessage = 'Could not send "${task.title}". Please try again.';
       notifyListeners();
+    } finally {
+      _pendingTaskSaves.remove(task);
     }
   }
 
@@ -575,7 +683,7 @@ class MapScreenViewModel extends ChangeNotifier {
   }
 
   void _replaceTasks(List<Task> loaded) {
-    loaded.sort(compareTasks);
+    loaded.sort(MapScreenViewModel.compareTasks);
     final loadedIds = loaded.map((task) => task.id).toSet();
     final pending = _pendingTasks
         .where((task) => task.id == null || !loadedIds.contains(task.id))
@@ -584,7 +692,7 @@ class MapScreenViewModel extends ChangeNotifier {
       ..clear()
       ..addAll(loaded)
       ..addAll(pending)
-      ..sort(compareTasks);
+      ..sort(MapScreenViewModel.compareTasks);
     notifyListeners();
   }
 
@@ -596,7 +704,7 @@ class MapScreenViewModel extends ChangeNotifier {
     }
   }
 
-  int _priorityOrder(String? priority) => switch (priority) {
+  static int _priorityOrder(String? priority) => switch (priority) {
     'U1' => 1,
     'U2' => 2,
     'U3' => 3,
