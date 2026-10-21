@@ -200,8 +200,7 @@ class AppRouter {
           return AuthGuard(
             child: TaskDetailPage(
               task: task,
-              onChanged: () {},
-              onDelete: () {},
+              onSave: () async {},
             ),
           );
         },
@@ -455,6 +454,9 @@ class AppRouter {
             child: AssigneeTasksView(
               assigneeName: assigneeName,
               tasks: tasks,
+              onOpenTask: (task) {
+                context.push('/task', extra: task);
+              },
             ),
           );
         },

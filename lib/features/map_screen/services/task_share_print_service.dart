@@ -16,8 +16,9 @@ class TaskSharePrintService {
                     '${task.deadline?.isNotEmpty == true ? ' (Due: ${task.deadline})' : ''}',
               )
               .join('\n');
-    await SharePlus.instance.share(
-      ShareParams(subject: 'Task list', text: '$title\n\n$contents'),
+    await Share.share(
+      '$title\n\n$contents',
+      subject: 'Task list',
     );
   }
 
