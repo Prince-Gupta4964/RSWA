@@ -297,7 +297,7 @@ class MapScreenViewModel extends ChangeNotifier {
       final pendingSave = _pendingTaskSaves[task];
       if (pendingSave != null) await pendingSave;
       if (task.id == null || task.id!.isEmpty) {
-        await addTask(task);
+        await _repository.addTask(task);
       } else {
         await updateTask(task);
       }
