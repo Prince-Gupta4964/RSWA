@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -26,6 +26,7 @@ class _CPDetailViewState extends State<CPDetailView> {
     'CP Details': false,
     'Associated Projects': false, // 🚀 NAYA
     'Associated Leads': false,
+    'Activity History': false, // 🚀 NAYA
     'Admin Controls & Score': false,
   };
 
@@ -194,6 +195,8 @@ class _CPDetailViewState extends State<CPDetailView> {
                       )).toList(),
                 ),
                 const SizedBox(height: 12),
+                _buildCPActivityHistorySection(widget.cp),
+                const SizedBox(height: 12),
 
                 // 3. SCORE & ADMIN CONTROLS (Strictly Admin only)
                 if (isAdmin) _buildCollapsible('Admin Controls & Score', Icons.admin_panel_settings_outlined, [
@@ -234,6 +237,90 @@ class _CPDetailViewState extends State<CPDetailView> {
         ),
         floatingActionButton: FloatingActionButton(backgroundColor: const Color(0xFFFF6B22), onPressed: () => context.push('/add-cp/${widget.cp.id}', extra: widget.cp), child: const Icon(Icons.edit, color: Colors.white)),
       ),
+    );
+  }
+
+  Widget _buildCPActivityHistorySection(CPModel cp) {
+    final String cpEmail = cp.rawData['email']?.toString().trim().toLowerCase() ?? '';
+    final String cpName = cp.cpName.trim().toLowerCase();
+    final String cpId = cp.id.trim();
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collectionGroup('activity_logs').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return _buildCollapsible(
+            'Activity History (Loading...)',
+            Icons.local_activity_outlined,
+            [const Center(child: CircularProgressIndicator(strokeWidth: 2))],
+          );
+        }
+
+        final allDocs = snapshot.data!.docs;
+        final matchingDocs = allDocs.where((doc) {
+          final data = doc.data();
+          final actor = data['actor'] is Map ? Map<String, dynamic>.from(data['actor']) : <String, dynamic>{};
+          final actorEmail = (actor['email'] ?? actor['userEmail'] ?? '').toString().trim().toLowerCase();
+          final actorUid = (actor['uid'] ?? actor['userId'] ?? '').toString().trim();
+          final actorName = (actor['name'] ?? actor['userName'] ?? '').toString().trim().toLowerCase();
+
+          return (cpEmail.isNotEmpty && actorEmail == cpEmail) ||
+                 (cpId.isNotEmpty && actorUid == cpId) ||
+                 (cpName.isNotEmpty && actorName == cpName);
+        }).toList();
+
+        matchingDocs.sort((a, b) {
+          final tsA = a.data()['timestamp'];
+          final tsB = b.data()['timestamp'];
+          if (tsA is Timestamp && tsB is Timestamp) {
+            return tsB.compareTo(tsA);
+          }
+          return 0;
+        });
+
+        return _buildCollapsible(
+          'Activity History (${matchingDocs.length})',
+          Icons.local_activity_outlined,
+          matchingDocs.isEmpty
+              ? [const Text('No property interactions recorded for this partner yet.', style: TextStyle(color: Colors.grey, fontSize: 13))]
+              : matchingDocs.map((doc) {
+                  final data = doc.data();
+                  final action = data['action']?.toString() ?? 'Interacted';
+                  final projectRef = doc.reference.parent.parent;
+                  final projectId = projectRef?.id ?? 'Unknown Project';
+
+                  final dynamic ts = data['timestamp'];
+                  String timeStr = 'Just now';
+                  if (ts != null && ts is Timestamp) {
+                    timeStr = DateFormat('dd/MM/yyyy hh:mm a').format(ts.toDate());
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor: Colors.orange.shade50,
+                          child: const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFFFF6B22)),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(action, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                              const SizedBox(height: 2),
+                              Text('Project: $projectId • $timeStr', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+        );
+      },
     );
   }
 
