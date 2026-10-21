@@ -907,37 +907,38 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _isEditingTitle
-                              ? TextField(
-                                  controller: _titleController,
-                                  autofocus: true,
-                                  decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                  ),
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  onSubmitted: _saveTitle,
-                                )
-                              : GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _isEditingTitle = true;
-                                      _titleController.text = task.title;
-                                    });
-                                  },
-                                  child: Text(
-                                    capitalizeFirstCharacter(task.title),
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w600,
-                                      decoration: task.isDone
-                                          ? TextDecoration.lineThrough
-                                          : TextDecoration.none,
-                                    ),
-                                  ),
-                                ),
+                          child: TextField(
+                            controller: _titleController,
+                            decoration: InputDecoration(
+                              hintText: 'Enter task name...',
+                              hintStyle: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade400,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              decoration: task.isDone
+                                  ? TextDecoration.lineThrough
+                                  : TextDecoration.none,
+                            ),
+                            onChanged: (val) {
+                              setState(() {
+                                task.title = val;
+                              });
+                              widget.onChanged();
+                            },
+                          ),
                         ),
                         _priorityBadgeHeader(),
                       ],
