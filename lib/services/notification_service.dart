@@ -44,7 +44,7 @@ class NotificationService {
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         iOS: DarwinInitializationSettings(),
       );
-      await _localNotifications.initialize(settings: settings);
+      await _localNotifications.initialize(settings);
 
       final androidNotifications = _localNotifications
           .resolvePlatformSpecificImplementation<
@@ -135,18 +135,18 @@ class NotificationService {
     if (notification == null) return;
 
     await _localNotifications.show(
-      id: message.hashCode,
-      title: notification.title ?? 'Task Manager',
-      body: notification.body ?? '',
-      notificationDetails: NotificationDetails(
+      message.hashCode,
+      notification.title ?? 'Task Manager',
+      notification.body ?? '',
+      const NotificationDetails(
         android: AndroidNotificationDetails(
-          _notificationChannel.id,
-          _notificationChannel.name,
-          channelDescription: _notificationChannel.description,
+          'task_notifications',
+          'Task notifications',
+          channelDescription: 'Notifications about assigned tasks and reminders',
           importance: Importance.max,
           priority: Priority.high,
         ),
-        iOS: const DarwinNotificationDetails(),
+        iOS: DarwinNotificationDetails(),
       ),
     );
   }
