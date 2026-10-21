@@ -197,7 +197,17 @@ class AppRouter {
         parentNavigatorKey: _rootNavigatorKey,
         path: '/task',
         builder: (context, state) {
-          final task = state.extra as Task;
+          final extra = state.extra;
+          Task task;
+          if (extra is Task) {
+            task = extra;
+          } else if (extra is Map) {
+            final map = Map<String, dynamic>.from(extra);
+            final id = map['id']?.toString() ?? '';
+            task = Task.fromMap(id, map);
+          } else {
+            task = Task('Untitled Task');
+          }
           return AuthGuard(
             child: TaskDetailPage(
               task: task,
