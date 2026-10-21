@@ -38,6 +38,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
     'Media & Gallery': false,
     'Associated Builders': false,
     'Associated Leads': false,
+    'Activity History': false, // 🚀 NAYA
     'Admin Controls': false,
   };
 
@@ -53,6 +54,13 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!widget.isPublicView) {
+        final authVM = Provider.of<AuthViewModel>(context, listen: false);
+        final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+        projectVM.logActivity(widget.project.id, 'Viewed Project Details', authVM.actorMetadata);
+      }
+    });
   }
 
   @override
@@ -91,12 +99,18 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
 
   Future<void> _makeCall(String? number) async {
     if (number == null || number.isEmpty) return;
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+    projectVM.logActivity(widget.project.id, 'Clicked Call ($number)', authVM.actorMetadata);
     final Uri url = Uri.parse('tel:$number');
     if (await canLaunchUrl(url)) await launchUrl(url);
   }
 
-  Future<void> _openFile(String? url) async {
+  Future<void> _openFile(String? url, {String actionName = 'Viewed File / Media'}) async {
     if (url == null || url.isEmpty) return;
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+    projectVM.logActivity(widget.project.id, actionName, authVM.actorMetadata);
     final Uri uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
@@ -725,6 +739,8 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
       if (isAdmin && !widget.isPublicView) ...[
         const SizedBox(height: 12),
         _buildEditHistorySection(p),
+        const SizedBox(height: 12),
+        _buildActivityHistorySection(p),
         const SizedBox(height: 12),
       ],
       if (isAdmin && !widget.isPublicView) _buildSection('Admin Controls', Icons.admin_panel_settings_outlined, [
@@ -2169,6 +2185,72 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
                 ),
               );
             }).toList(),
+    );
+  }
+
+  Widget _buildActivityHistorySection(ProjectModel project) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('projects')
+          .doc(project.id)
+          .collection('activity_logs')
+          .orderBy('timestamp', descending: true)
+          .limit(50)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return _buildSection(
+            'Activity History (Loading...)',
+            Icons.local_activity_outlined,
+            [const Center(child: CircularProgressIndicator(strokeWidth: 2))],
+          );
+        }
+
+        final docs = snapshot.data!.docs;
+        return _buildSection(
+          'Activity History (${docs.length})',
+          Icons.local_activity_outlined,
+          docs.isEmpty
+              ? [const Text('No property interactions recorded yet.', style: TextStyle(color: Colors.grey, fontSize: 13))]
+              : docs.map((doc) {
+                  final data = doc.data();
+                  final action = data['action']?.toString() ?? 'Interacted';
+                  final actor = data['actor'] is Map ? Map<String, dynamic>.from(data['actor']) : <String, dynamic>{};
+                  final name = actor['name'] ?? actor['userName'] ?? 'Unknown User';
+                  final role = actor['role'] ?? actor['userRole'] ?? 'User';
+                  final email = actor['email'] ?? actor['userEmail'] ?? '';
+                  final dynamic ts = data['timestamp'];
+                  String timeStr = 'Just now';
+                  if (ts != null && ts is Timestamp) {
+                    timeStr = DateFormat('dd/MM/yyyy hh:mm a').format(ts.toDate());
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor: Colors.orange.shade50,
+                          child: const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFFFF6B22)),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('$name ($role) - $action', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                              const SizedBox(height: 2),
+                              Text('$timeStr${email.isNotEmpty ? ' • $email' : ''}', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+        );
+      },
     );
   }
 

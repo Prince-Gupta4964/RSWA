@@ -16,6 +16,19 @@ class ProjectViewModel extends ChangeNotifier {
     migrateOldProjectDocumentsToNameIds();
   }
 
+  Future<void> logActivity(String projectId, String action, Map<String, dynamic>? actorMetadata) async {
+    try {
+      if (projectId.isEmpty) return;
+      await _db.collection('projects').doc(projectId).collection('activity_logs').add({
+        'action': action,
+        'actor': actorMetadata ?? {},
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error logging project activity: $e');
+    }
+  }
+
   String _sanitizeDocId(String name) {
     if (name.trim().isEmpty) return 'unnamed-project';
     return name.trim().toLowerCase().replaceAll('/', '-').replaceAll('\\', '-').replaceAll(RegExp(r'\s+'), '-');
