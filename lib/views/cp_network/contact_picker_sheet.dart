@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../viewmodels/cp_viewmodel.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 
 class ContactPickerSheet extends StatefulWidget {
-  const ContactPickerSheet({super.key});
+  final CPViewModel cpVM;
+  final AuthViewModel authVM;
+  const ContactPickerSheet({super.key, required this.cpVM, required this.authVM});
 
   @override
   State<ContactPickerSheet> createState() => _ContactPickerSheetState();
