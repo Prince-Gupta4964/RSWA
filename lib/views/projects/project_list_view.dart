@@ -48,7 +48,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   String? _selectedSubCategory;
   final Map<String, List<String>> _subTypesMap = {
     'Project': ['Residential', 'Shop', 'Bungalow', 'Redevelopment', 'Bulk'],
-    'Apartment': ['1BHK', '2BHK', '3BHK', '4BHK', '5BHK'],
+    'Flat': ['1BHK', '2BHK', '3BHK', '4BHK', '5BHK'],
     'Shop': ['1 STOREY', '2 STOREY'],
     'Bungalow': ['1BHK', '2BHK', '3BHK', '4BHK', '5BHK'],
     'Land': ['NA', 'Non-NA'],
@@ -56,7 +56,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   final List<Map<String, dynamic>> _categories = [
     {'label': 'All', 'icon': Icons.grid_view_rounded, 'value': 'All'},
     {'label': 'Projects', 'icon': Icons.location_city_rounded, 'value': 'Project'},
-    {'label': 'Flats', 'icon': Icons.apartment_rounded, 'value': 'Apartment'},
+    {'label': 'Flat', 'icon': Icons.apartment_rounded, 'value': 'Flat'},
     {'label': 'Shops', 'icon': Icons.storefront_outlined, 'value': 'Shop'},
     {'label': 'Bungalow', 'icon': Icons.gite_outlined, 'value': 'Bungalow'},
     {'label': 'Land', 'icon': Icons.landscape_outlined, 'value': 'Land'},
@@ -756,14 +756,15 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     if (!matchesMain) return false;
 
     if (_selectedSubCategory != null && _selectedSubCategory!.isNotEmpty) {
-      final sub = _selectedSubCategory!.toLowerCase();
-      final detailsStr = project.propertyDetails.values.map((e) => e.toString()).join(' ').toLowerCase();
-      final configStr = (project.propertyDetails['configuration'] ?? '').toString().toLowerCase();
-      final subTypeStr = (project.propertyDetails['subType'] ?? '').toString().toLowerCase();
-      final conditionStr = (project.propertyDetails['condition'] ?? '').toString().toLowerCase();
+      final sub = _selectedSubCategory!.toLowerCase().replaceAll(RegExp(r'[\s\-_]'), '');
+      final detailsStr = project.propertyDetails.values.map((e) => e.toString().toLowerCase().replaceAll(RegExp(r'[\s\-_]'), '')).join(' ');
+      final configStr = (project.propertyDetails['configuration'] ?? '').toString().toLowerCase().replaceAll(RegExp(r'[\s\-_]'), '');
+      final subTypeStr = (project.propertyDetails['subType'] ?? '').toString().toLowerCase().replaceAll(RegExp(r'[\s\-_]'), '');
+      final conditionStr = (project.propertyDetails['condition'] ?? '').toString().toLowerCase().replaceAll(RegExp(r'[\s\-_]'), '');
+      final pTypeStr = project.propertyType.toLowerCase().replaceAll(RegExp(r'[\s\-_]'), '');
       
-      // Only filter out if there's a strict contradiction
-      if (subTypeStr.isNotEmpty && !subTypeStr.contains(sub) && !detailsStr.contains(sub) && !configStr.contains(sub) && !conditionStr.contains(sub)) {
+      // Only filter out if there's a strict contradiction using normalized strings (ignoring spaces and hyphens)
+      if (subTypeStr.isNotEmpty && !subTypeStr.contains(sub) && !detailsStr.contains(sub) && !configStr.contains(sub) && !conditionStr.contains(sub) && !pTypeStr.contains(sub)) {
         return false;
       }
     }
