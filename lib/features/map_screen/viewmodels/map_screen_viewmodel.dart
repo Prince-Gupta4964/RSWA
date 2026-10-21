@@ -296,10 +296,11 @@ class MapScreenViewModel extends ChangeNotifier {
     try {
       final pendingSave = _pendingTaskSaves[task];
       if (pendingSave != null) await pendingSave;
-      if (task.id == null) {
-        throw StateError('Task has not been saved yet.');
+      if (task.id == null || task.id!.isEmpty) {
+        await addTask(task);
+      } else {
+        await updateTask(task);
       }
-      await updateTask(task);
       sortTasks();
     } catch (error) {
       task.steps.remove(step);
