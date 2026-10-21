@@ -1551,8 +1551,8 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     final location = project.displayLocation;
 
     final minC = project.propertyType == 'Land' 
-        ? (details['minCostLand'] ?? details['minCost']) 
-        : (details['minCost'] ?? details['minCostLand']);
+        ? (details['plotCostLand'] ?? details['minCostLand'] ?? details['minCost']) 
+        : (details['minCost'] ?? details['minCostLand'] ?? details['plotCostLand']);
     final maxC = project.propertyType == 'Land' 
         ? (details['maxCostLand'] ?? details['maxCost']) 
         : (details['maxCost'] ?? details['maxCostLand']);
@@ -2008,7 +2008,8 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     String rawPrice = details['startingPrice']?.toString() ?? '';
     if (rawPrice.isEmpty) {
       if (project.propertyType == 'Land') {
-        if (details['minCostLand'] != null) rawPrice = '${details['minCostLand']}${details['maxCostLand'] != null ? ' - ${details['maxCostLand']}' : ''}';
+        final landCost = details['plotCostLand'] ?? details['minCostLand'];
+        if (landCost != null) rawPrice = '$landCost${details['maxCostLand'] != null ? ' - ${details['maxCostLand']}' : ''}';
       } else {
         if (details['minCost'] != null) rawPrice = '${details['minCost']}${details['maxCost'] != null ? ' - ${details['maxCost']}' : ''}';
       }

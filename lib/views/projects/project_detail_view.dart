@@ -450,7 +450,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
     final String? coverImage = imageUrls.isNotEmpty ? imageUrls.first : null;
 
     final String config = (details['configuration'] is List) ? (details['configuration'] as List).join(', ') : (details['configuration'] ?? '').toString();
-    final String rawPrice = (details['minCost'] ?? details['startingPrice'] ?? details['minCostLand'] ?? '').toString().trim();
+    final String rawPrice = (details['minCost'] ?? details['plotCostLand'] ?? details['startingPrice'] ?? details['minCostLand'] ?? '').toString().trim();
     final String priceStr = rawPrice.isNotEmpty ? _formatPrice(rawPrice) : '';
 
     String shareDesc = 'Location: $location';
@@ -503,7 +503,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
     final bool isLand = p.propertyType == 'Land';
 
     // 🚀 Calculate 7 Essential Property Details fields
-    final minC = isLand ? (det['minCostLand'] ?? det['minCost']) : (det['minCost'] ?? det['minCostLand']);
+    final minC = isLand ? (det['plotCostLand'] ?? det['minCostLand'] ?? det['minCost']) : (det['minCost'] ?? det['plotCostLand'] ?? det['minCostLand']);
     final maxC = isLand ? (det['maxCostLand'] ?? det['maxCost']) : (det['maxCost'] ?? det['maxCostLand']);
     String propPriceRange = 'On Request';
     if (minC != null && minC.toString().trim().isNotEmpty) {

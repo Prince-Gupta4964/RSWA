@@ -234,16 +234,91 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
         multiple: true,
       );
     } catch (e) {
+      debugPrint("Native contact picker error (Falling back to manual bulk import): $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.redAccent),
-        );
+        _showManualBulkImportDialog(cpVM, authVM);
       }
       return;
     }
 
-    if (selectedData.isEmpty) return;
+    if (selectedData.isEmpty) {
+      if (mounted) {
+        _showManualBulkImportDialog(cpVM, authVM);
+      }
+      return;
+    }
 
+    await _processImportedContacts(selectedData, cpVM, authVM);
+  }
+
+  void _showManualBulkImportDialog(CPViewModel cpVM, AuthViewModel authVM) {
+    final TextEditingController inputController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Bulk Import Partners (Web / iPhone Fallback)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Enter or paste contacts below (One per line in format: Name, Phone):\nExample:\nRajesh Sharma, 9876543210\nAmit Kumar, 9123456789',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: inputController,
+                  maxLines: 6,
+                  decoration: InputDecoration(
+                    hintText: 'Name, Phone\nName, Phone',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B22), foregroundColor: Colors.white),
+              onPressed: () async {
+                final text = inputController.text.trim();
+                Navigator.pop(context);
+                if (text.isEmpty) return;
+
+                final lines = text.split('\n');
+                List<Map<String, String>> manualData = [];
+                for (var line in lines) {
+                  final parts = line.split(',');
+                  if (parts.isNotEmpty) {
+                    final name = parts[0].trim();
+                    final phone = parts.length > 1 ? parts[1].trim() : '';
+                    if (name.isNotEmpty) {
+                      manualData.add({'name': name, 'tel': phone, 'email': ''});
+                    }
+                  }
+                }
+
+                if (manualData.isNotEmpty) {
+                  await _processImportedContacts(manualData, cpVM, authVM);
+                }
+              },
+              child: const Text('Import Contacts'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _processImportedContacts(List<Map<String, String>> selectedData, CPViewModel cpVM, AuthViewModel authVM) async {
     if (!mounted) return;
     
     // Show loading indicator
