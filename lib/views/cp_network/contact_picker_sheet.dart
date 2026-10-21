@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../viewmodels/cp_viewmodel.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 
 class ContactPickerSheet extends StatefulWidget {
-  const ContactPickerSheet({super.key});
+  final CPViewModel cpVM;
+  final AuthViewModel authVM;
+  const ContactPickerSheet({super.key, required this.cpVM, required this.authVM});
 
   @override
   State<ContactPickerSheet> createState() => _ContactPickerSheetState();
@@ -52,6 +56,7 @@ class _ContactPickerSheetState extends State<ContactPickerSheet> {
           setState(() {
             _error = 'Contacts access is permanently blocked. Please enable it in App Settings.';
             _isLoading = false;
+            _isManualMode = true;
           });
         }
       } else {
@@ -59,6 +64,7 @@ class _ContactPickerSheetState extends State<ContactPickerSheet> {
           setState(() {
             _error = 'Permission denied. We need contact access to import your partners.';
             _isLoading = false;
+            _isManualMode = true;
           });
         }
       }
@@ -68,9 +74,37 @@ class _ContactPickerSheetState extends State<ContactPickerSheet> {
         setState(() {
           _error = 'Error fetching contacts: $e';
           _isLoading = false;
+          _isManualMode = true;
         });
       }
     }
+  }
+
+  void _returnSelected() {
+    List<Map<String, String>> contactsToAdd = [];
+
+    if (_isManualMode) {
+      final text = _manualInputController.text.trim();
+      final lines = text.split('\n');
+      for (var line in lines) {
+        final parts = line.split(',');
+        if (parts.isNotEmpty) {
+          final name = parts[0].trim();
+          final phone = parts.length > 1 ? parts[1].trim() : '';
+          if (name.isNotEmpty) {
+            contactsToAdd.add({'name': name, 'tel': phone, 'email': ''});
+          }
+        }
+      }
+    } else {
+      contactsToAdd = _selectedContacts.map((c) => {
+        'name': c.displayName ?? 'Unknown',
+        'tel': c.phones.isNotEmpty ? c.phones.first.number : '',
+        'email': c.emails.isNotEmpty ? c.emails.first.address : '',
+      }).toList();
+    }
+
+    Navigator.pop(context, contactsToAdd);
   }
 
   @override
@@ -193,7 +227,7 @@ class _ContactPickerSheetState extends State<ContactPickerSheet> {
                                   final String firstChar = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
                                   
                                   final String phoneNum = contact.phones.isNotEmpty 
-                                      ? (contact.phones.first.number ?? 'No number') 
+                                      ? contact.phones.first.number 
                                       : 'No number';
 
                                   return CheckboxListTile(
@@ -226,32 +260,8 @@ class _ContactPickerSheetState extends State<ContactPickerSheet> {
               height: 54,
               child: ElevatedButton(
                 onPressed: _isManualMode
-                    ? () {
-                        final text = _manualInputController.text.trim();
-                        if (text.isEmpty) {
-                          Navigator.pop(context, <Contact>[]);
-                          return;
-                        }
-                        // Parse manual input lines into mock/temp contacts or pass back parsed data
-                        final lines = text.split('\n');
-                        List<Contact> parsedContacts = [];
-                        for (var line in lines) {
-                          final parts = line.split(',');
-                          if (parts.isNotEmpty) {
-                            final name = parts[0].trim();
-                            final phone = parts.length > 1 ? parts[1].trim() : '';
-                            if (name.isNotEmpty) {
-                              final c = Contact(
-                                displayName: name,
-                                phones: phone.isNotEmpty ? [Phone(number: phone)] : [],
-                              );
-                              parsedContacts.add(c);
-                            }
-                          }
-                        }
-                        Navigator.pop(context, parsedContacts);
-                      }
-                    : (_selectedContacts.isEmpty ? null : () => Navigator.pop(context, _selectedContacts.toList())),
+                    ? _returnSelected
+                    : (_selectedContacts.isEmpty ? null : _returnSelected),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF6B22),
                   disabledBackgroundColor: Colors.grey.shade300,
