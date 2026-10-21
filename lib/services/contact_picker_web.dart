@@ -24,6 +24,8 @@ class ContactPickerService {
   /// Opens the native browser contact picker and returns selected contacts.
   static Future<List<Map<String, String>>> pickContacts({
     required BuildContext context,
+    Object? cpVM,
+    Object? authVM,
     bool multiple = true,
   }) async {
     if (!await isSupported()) {
