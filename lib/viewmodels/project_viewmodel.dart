@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -73,15 +74,20 @@ class ProjectViewModel extends ChangeNotifier {
     }
   }
 
-  void fetchProjects() {
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (_isLoading) {
-        _isLoading = false;
-        notifyListeners();
-      }
-    });
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _projectsSubscription;
 
-    _db
+  @override
+  void dispose() {
+    _projectsSubscription?.cancel();
+    super.dispose();
+  }
+
+  void fetchProjects() {
+    _isLoading = true;
+    notifyListeners();
+
+    _projectsSubscription?.cancel();
+    _projectsSubscription = _db
         .collection('projects')
         .snapshots()
         .listen(
@@ -105,7 +111,7 @@ class ProjectViewModel extends ChangeNotifier {
             notifyListeners();
           },
           onError: (error) {
-            debugPrint("⚠️ FIREBASE FETCH ERROR (PROJECTS): $error. Please check your Firestore Security Rules in Firebase Console.");
+            debugPrint("⚠️ FIREBASE FETCH ERROR (PROJECTS): $error.");
             _isLoading = false;
             notifyListeners();
           },
