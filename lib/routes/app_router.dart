@@ -199,19 +199,25 @@ class AppRouter {
         builder: (context, state) {
           final extra = state.extra;
           Task task;
+          Future<void> Function()? onSave;
           if (extra is Task) {
             task = extra;
           } else if (extra is Map) {
-            final map = Map<String, dynamic>.from(extra);
-            final id = map['id']?.toString() ?? '';
-            task = Task.fromMap(id, map);
+            if (extra.containsKey('task') && extra['task'] is Task) {
+              task = extra['task'] as Task;
+              onSave = extra['onSave'] as Future<void> Function()?;
+            } else {
+              final map = Map<String, dynamic>.from(extra);
+              final id = map['id']?.toString() ?? '';
+              task = Task.fromMap(id, map);
+            }
           } else {
             task = Task('Untitled Task');
           }
           return AuthGuard(
             child: TaskDetailPage(
               task: task,
-              onSave: () async {},
+              onSave: onSave ?? () async {},
             ),
           );
         },
