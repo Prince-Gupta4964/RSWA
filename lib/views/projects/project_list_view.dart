@@ -639,6 +639,24 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                         child: const Text('EXPLORE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                       ),
                     ),
+                    if (_hasActiveFilters) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            _clearAllFilters();
+                            Navigator.pop(context);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFFF6B22), width: 1.5),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('CLEAR ALL FILTERS', style: TextStyle(color: Color(0xFFFF6B22), fontWeight: FontWeight.bold, fontSize: 14)),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                   ],
                 ),
@@ -924,16 +942,13 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                   tooltip: 'Search',
                 ),
                 IconButton(
-                  icon: const Icon(Icons.tune_rounded, color: Colors.black87),
-                  onPressed: _showSearchPopup,
-                  tooltip: 'Filter',
-                ),
-                if (_hasActiveFilters)
-                  IconButton(
-                    icon: const Icon(Icons.filter_alt_off_rounded, color: Color(0xFFFF6B22)),
-                    onPressed: _clearAllFilters,
-                    tooltip: 'Clear Filters',
+                  icon: Icon(
+                    Icons.tune_rounded,
+                    color: _hasActiveFilters ? const Color(0xFFFF6B22) : Colors.black87,
                   ),
+                  onPressed: _showSearchPopup,
+                  tooltip: _hasActiveFilters ? 'Filters Active (Tap to Edit)' : 'Filter',
+                ),
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert, color: Colors.black87),
                   onSelected: (value) {
@@ -1105,7 +1120,23 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                           
                           if (!isBypassTab) {
                             if (!_matchesSearchCategory(project)) return false;
-                            if (_selectedTypeFilter != null && project.propertyType != _selectedTypeFilter) return false;
+                            if (_selectedTypeFilter != null) {
+                              final t = project.propertyType.toLowerCase();
+                              final f = _selectedTypeFilter!.toLowerCase();
+                              bool matches = false;
+                              if (f == 'flat' || f == 'apartment') {
+                                matches = t == 'flat' || t == 'apartment' || t == 'residential' || t == 'flats';
+                              } else if (f == 'shop') {
+                                matches = t == 'shop' || t == 'commercial' || t == 'office' || t == 'showroom' || t == 'shops';
+                              } else if (f == 'bungalow') {
+                                matches = t == 'bungalow' || t == 'villa';
+                              } else if (f == 'land' || f == 'plot') {
+                                matches = t == 'land' || t == 'plot';
+                              } else {
+                                matches = t == f;
+                              }
+                              if (!matches) return false;
+                            }
                             if (_selectedSubTypeFilter != null) {
                               final sub = (project.propertyDetails['subType'] ?? project.propertyDetails['condition'] ?? project.rawData['subType'] ?? '').toString().toLowerCase();
                               if (sub != _selectedSubTypeFilter!.toLowerCase()) return false;
