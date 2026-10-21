@@ -160,6 +160,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     AuthViewModel authViewModel,
   ) {
     final myTasks = viewModel.myTasks(authViewModel);
+    if (!_hasAdminAccess) {
+      return myTasks;
+    }
     return switch (_tabController.index) {
       0 => MapScreenViewModel.myDayTasks(myTasks),
       1 => myTasks,

@@ -99,10 +99,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
   Future<List<String>> _loadAssigneesFromFirestore() async {
     if (_assigneesCache != null) return _assigneesCache!;
-    final snapshots = await Future.wait([
-      FirebaseFirestore.instance.collection('users').get(),
-      FirebaseFirestore.instance.collection('cps').get(),
-    ]);
+    final snapshot = await FirebaseFirestore.instance.collection('users').get();
     final valuesByName = <String, String>{};
 
     void addName(Object? value) {
@@ -112,19 +109,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       }
     }
 
-    for (final doc in snapshots[0].docs) {
+    for (final doc in snapshot.docs) {
       final data = doc.data();
       addName(data['name'] ?? data['fullName'] ?? data['email'] ?? doc.id);
-    }
-    for (final doc in snapshots[1].docs) {
-      final data = doc.data();
-      addName(
-        data['cpName'] ??
-            data['name'] ??
-            data['fullName'] ??
-            data['email'] ??
-            doc.id,
-      );
     }
 
     final values = valuesByName.values.toList()

@@ -59,6 +59,7 @@ import '../features/map_screen/models/task.dart';
 
 class AppRouter {
   static final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+  static GlobalKey<NavigatorState> get rootNavigatorKey => _rootNavigatorKey;
 
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,

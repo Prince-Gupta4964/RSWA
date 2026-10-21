@@ -81,10 +81,7 @@ class TaskRepository {
 
   Future<List<String>> loadAssignees() async {
     if (_assigneesCache != null) return _assigneesCache!;
-    final snapshots = await Future.wait([
-      _firestore.collection('users').get(),
-      _firestore.collection('cps').get(),
-    ]);
+    final snapshot = await _firestore.collection('users').get();
     final valuesByName = <String, String>{};
 
     void addName(Object? value) {
@@ -94,15 +91,9 @@ class TaskRepository {
       }
     }
 
-    for (final doc in snapshots[0].docs) {
+    for (final doc in snapshot.docs) {
       final data = doc.data();
       addName(data['name'] ?? data['fullName'] ?? data['email']);
-    }
-    for (final doc in snapshots[1].docs) {
-      final data = doc.data();
-      addName(
-        data['cpName'] ?? data['name'] ?? data['fullName'] ?? data['email'],
-      );
     }
 
     _assigneesCache = valuesByName.values.toList()

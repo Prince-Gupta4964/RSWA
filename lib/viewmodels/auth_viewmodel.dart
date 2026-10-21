@@ -35,6 +35,7 @@ class AuthViewModel extends ChangeNotifier {
   Map<String, dynamic>? get userData => _userData;
   bool get isCheckingSession => _isCheckingSession;
   bool get isAuthenticated => _userId != null && _userData != null;
+  bool get loggedIn => isAuthenticated;
   AppRole get appRole => _permissionRole;
   AppPermissions get permissions => AppPermissions.forRole(appRole);
   String get roleLabel => _userRole?.trim().isNotEmpty == true
