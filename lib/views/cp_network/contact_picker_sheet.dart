@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../viewmodels/cp_viewmodel.dart';
@@ -36,6 +37,16 @@ class _ContactPickerSheetState extends State<ContactPickerSheet> {
 
   Future<void> _fetchContacts() async {
     try {
+      if (kIsWeb) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _isManualMode = true;
+          });
+        }
+        return;
+      }
+
       debugPrint("ContactPicker: Requesting permissions...");
       final status = await Permission.contacts.request();
       debugPrint("ContactPicker: Permission status = $status");

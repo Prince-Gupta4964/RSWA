@@ -227,14 +227,35 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
 
 
   Future<void> _importContacts(CPViewModel cpVM, AuthViewModel authVM) async {
-    final List<Map<String, String>>? selectedData = await showModalBottomSheet<List<Map<String, String>>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ContactPickerSheet(cpVM: cpVM, authVM: authVM),
-    );
+    List<Map<String, String>> selectedData = [];
 
-    if (selectedData == null || selectedData.isEmpty) return;
+    try {
+      selectedData = await ContactPickerService.pickContacts(
+        context: context,
+        cpVM: cpVM,
+        authVM: authVM,
+        multiple: true,
+      );
+    } catch (e) {
+      debugPrint("Contact picker error: $e");
+      if (mounted) {
+        final List<Map<String, String>>? manualData = await showModalBottomSheet<List<Map<String, String>>>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => ContactPickerSheet(cpVM: cpVM, authVM: authVM),
+        );
+        if (manualData != null && manualData.isNotEmpty) {
+          selectedData = manualData;
+        } else {
+          return;
+        }
+      } else {
+        return;
+      }
+    }
+
+    if (selectedData.isEmpty) return;
 
     await Future.delayed(const Duration(milliseconds: 200));
     if (!mounted) return;
