@@ -736,17 +736,19 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     if (_searchCategory == 'All' || _searchCategory.isEmpty) return true;
     final t = project.propertyType.toLowerCase();
     final cat = _searchCategory.toLowerCase();
-    bool matchesMain = false;
+    
+    // 🚀 NAYA: Looser, user-friendly matching so clicking category chips doesn't blank out the list
+    bool matchesMain = true;
     if (cat == 'project') {
-      matchesMain = t == 'project' || t == 'residential';
+      matchesMain = true; // "Projects" tab shows all properties by default
     } else if (cat == 'apartment' || cat == 'flat') {
-      matchesMain = t == 'flat' || t == 'apartment' || t == 'residential' || t == 'flats';
+      matchesMain = t.contains('flat') || t.contains('apartment') || t.contains('residential') || t.contains('flats') || t.contains('project');
     } else if (cat == 'shop') {
-      matchesMain = t == 'shop' || t == 'commercial' || t == 'office' || t == 'showroom' || t == 'shops';
+      matchesMain = t.contains('shop') || t.contains('commercial') || t.contains('office') || t.contains('showroom') || t.contains('shops');
     } else if (cat == 'bungalow') {
-      matchesMain = t == 'bungalow' || t == 'villa';
+      matchesMain = t.contains('bungalow') || t.contains('villa') || t.contains('house');
     } else if (cat == 'land' || cat == 'plot') {
-      matchesMain = t == 'land' || t == 'plot';
+      matchesMain = t.contains('land') || t.contains('plot') || t.contains('na');
     } else {
       matchesMain = t.contains(cat);
     }
@@ -758,7 +760,10 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
       final detailsStr = project.propertyDetails.values.map((e) => e.toString()).join(' ').toLowerCase();
       final configStr = (project.propertyDetails['configuration'] ?? '').toString().toLowerCase();
       final subTypeStr = (project.propertyDetails['subType'] ?? '').toString().toLowerCase();
-      if (!detailsStr.contains(sub) && !configStr.contains(sub) && !subTypeStr.contains(sub)) {
+      final conditionStr = (project.propertyDetails['condition'] ?? '').toString().toLowerCase();
+      
+      // Only filter out if there's a strict contradiction
+      if (subTypeStr.isNotEmpty && !subTypeStr.contains(sub) && !detailsStr.contains(sub) && !configStr.contains(sub) && !conditionStr.contains(sub)) {
         return false;
       }
     }
