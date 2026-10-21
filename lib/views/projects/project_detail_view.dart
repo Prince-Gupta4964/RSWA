@@ -54,13 +54,6 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!widget.isPublicView) {
-        final authVM = Provider.of<AuthViewModel>(context, listen: false);
-        final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
-        projectVM.logActivity(widget.project.id, 'Viewed Project Details', authVM.actorMetadata);
-      }
-    });
   }
 
   @override
@@ -101,12 +94,12 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
     if (number == null || number.isEmpty) return;
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
-    projectVM.logActivity(widget.project.id, 'Clicked Call ($number)', authVM.actorMetadata);
+    projectVM.logActivity(widget.project.id, 'Clicked Call ($number) from Detail', authVM.actorMetadata);
     final Uri url = Uri.parse('tel:$number');
     if (await canLaunchUrl(url)) await launchUrl(url);
   }
 
-  Future<void> _openFile(String? url, {String actionName = 'Viewed File / Media'}) async {
+  Future<void> _openFile(String? url, {String actionName = 'Viewed File / Media from Detail'}) async {
     if (url == null || url.isEmpty) return;
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
     final projectVM = Provider.of<ProjectViewModel>(context, listen: false);

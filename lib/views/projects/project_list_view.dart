@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../utils/meta_tag_helper.dart'; // 🚀 NAYA
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
@@ -8,11 +10,13 @@ import 'package:geocoding/geocoding.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/project_viewmodel.dart';
 import '../../viewmodels/app_configuration_viewmodel.dart';
 import '../../models/project_model.dart';
 import '../../utils/role_permissions.dart';
+import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_drawer.dart';
 import 'whatsapp_status_viewer.dart';
 
@@ -1600,8 +1604,12 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            if (_isSelectionMode) _toggleProjectSelection(project.id);
-            else context.push('/project-detail/${project.id}', extra: project);
+            if (_isSelectionMode) {
+              _toggleProjectSelection(project.id);
+            } else {
+              projectVM.logActivity(project.id, 'Clicked Project Card from List', authVM.actorMetadata);
+              context.push('/project-detail/${project.id}', extra: project);
+            }
           },
           onLongPress: () => _toggleProjectSelection(project.id),
           child: IntrinsicHeight(
@@ -1700,6 +1708,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                             GestureDetector(
                               onTap: () {
                                 if (authVM.userUid.isNotEmpty) {
+                                  projectVM.logActivity(project.id, isLiked ? 'Removed Favorite from List' : 'Added Favorite from List', authVM.actorMetadata);
                                   projectVM.toggleProjectFavorite(project.id, authVM.userUid, favUids);
                                 }
                               },
@@ -1810,7 +1819,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                             children: [
                               Expanded(
                                 child: OutlinedButton(
-                                  onPressed: () => context.push('/project-detail/${project.id}', extra: project),
+                                  onPressed: () => _handleGetQuote(context, project),
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(color: Colors.grey.shade400),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -1822,7 +1831,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                               const SizedBox(width: 6),
                               Expanded(
                                 child: OutlinedButton(
-                                  onPressed: () => context.push('/project-detail/${project.id}', extra: project),
+                                  onPressed: () => _handleGetBrochure(context, project),
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(color: Colors.grey.shade400),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -1843,7 +1852,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                                 child: IconButton(
                                   padding: EdgeInsets.zero,
                                   icon: const Icon(Icons.share_outlined, color: Colors.black87, size: 18),
-                                  onPressed: () => context.push('/project-detail/${project.id}', extra: project),
+                                  onPressed: () => _handleShareProject(context, project),
                                 ),
                               ),
                             ],
@@ -1987,9 +1996,162 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
     );
   }
 
+  void _handleShareProject(BuildContext context, ProjectModel project) {
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+    projectVM.logActivity(project.id, 'Shared Project from List', authVM.actorMetadata);
+
+    final details = project.propertyDetails;
+    final String loc = (details['googleLocation'] ?? details['areaName'] ?? details['location'] ?? details['address'] ?? project.rawData['googleLocation'] ?? '').toString().trim();
+    final String location = loc.isNotEmpty && loc != 'null' ? loc : 'Location N/A';
+
+    String rawPrice = details['startingPrice']?.toString() ?? '';
+    if (rawPrice.isEmpty) {
+      if (project.propertyType == 'Land') {
+        if (details['minCostLand'] != null) rawPrice = '${details['minCostLand']}${details['maxCostLand'] != null ? ' - ${details['maxCostLand']}' : ''}';
+      } else {
+        if (details['minCost'] != null) rawPrice = '${details['minCost']}${details['maxCost'] != null ? ' - ${details['maxCost']}' : ''}';
+      }
+    }
+    final String formattedPrice = _formatPrice(rawPrice);
+    final String priceText = formattedPrice == 'On Request' ? formattedPrice : '₹ $formattedPrice';
+
+    final String baseUrl = Uri.base.origin;
+    final String encodedName = Uri.encodeComponent(project.projectName);
+    final String shareLink = "$baseUrl/share/project/$encodedName";
+
+    // 🚀 NAYA: Rich Share Message with Property+ at top, Building Name, Location, Price
+    final String message = "Property+\n\n"
+        "🏢 Building: ${project.projectName}\n"
+        "📍 Location: $location\n"
+        "💰 Starting Price: $priceText\n\n"
+        "🔗 View Property Details & Photos:\n$shareLink";
+
+    List<String> imageUrls = (details['images'] is Iterable) ? List<String>.from(details['images']) : [];
+    final String? coverImage = imageUrls.isNotEmpty ? imageUrls.first : null;
+
+    // Dynamically update OpenGraph Meta Tags on Web for chat card previews
+    MetaTagHelper.updatePropertyMetaTags(
+      title: '${project.projectName} - $location',
+      description: 'Location: $location | Price: $priceText',
+      imageUrl: coverImage,
+    );
+
+    Clipboard.setData(ClipboardData(text: shareLink)).then((_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Property link copied to clipboard!'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.blue,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
+
+    // Triggers OS native app share picker (WhatsApp, Messages, Instagram, Mail, etc.)
+    Share.share(message, subject: 'Property+ | ${project.projectName}');
+  }
+
+  Future<void> _handleGetBrochure(BuildContext context, ProjectModel project) async {
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+    projectVM.logActivity(project.id, 'Clicked Get Brochure from List', authVM.actorMetadata);
+
+    final details = project.propertyDetails;
+    final String? brochureUrl = details['brochurePdf']?.toString() ?? details['brochure']?.toString();
+    if (brochureUrl != null && brochureUrl.trim().isNotEmpty && brochureUrl.startsWith('http')) {
+      final Uri url = Uri.parse(brochureUrl.trim());
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url);
+        return;
+      }
+    }
+    if (context.mounted) {
+      context.push('/project-detail/${project.id}', extra: project);
+    }
+  }
+
+  void _handleGetQuote(BuildContext context, ProjectModel project) {
+    final authVM = Provider.of<AuthViewModel>(context, listen: false);
+    final projectVM = Provider.of<ProjectViewModel>(context, listen: false);
+    projectVM.logActivity(project.id, 'Clicked Get Details from List', authVM.actorMetadata);
+
+    final details = project.propertyDetails;
+    final String propertyName = project.projectName;
+    final String companyName = (details['projectCompany'] ?? project.rawData['projectCompany'] ?? '').toString().trim();
+    final String loc = (details['location'] ?? details['googleLocation'] ?? details['areaName'] ?? details['address'] ?? project.rawData['location'] ?? '').toString().trim();
+    final String location = loc.isNotEmpty && loc != 'null' ? loc : 'Location N/A';
+
+    final String message = "Property Name: $propertyName\n"
+        "Company Name: ${companyName.isNotEmpty ? companyName : 'N/A'}\n"
+        "Location: $location\n\n"
+        "I want more details about this project";
+
+    final String phone = '8793693314';
+    final Uri whatsappUri = Uri.parse('https://wa.me/91$phone?text=${Uri.encodeComponent(message)}');
+
+    launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+  }
+
   bool _matchesSelectedCondition(ProjectModel project) {
     if (_selectedConditionFilter == null || _selectedConditionFilter!.isEmpty) return true;
     final condition = project.propertyDetails['condition']?.toString().trim().toLowerCase() ?? 'new';
     return condition == _selectedConditionFilter!.trim().toLowerCase();
+  }
+
+  Map<String, Color> _getSubTypeColors(String subType) {
+    final st = subType.trim().toLowerCase();
+
+    if (st == 'new' || st == 'new launch') {
+      return {
+        'bg': const Color(0xFFE6F4EA), // Emerald Green
+        'text': const Color(0xFF137333),
+        'border': const Color(0xFFCEEAD6),
+      };
+    } else if (st == 'uc' || st == 'under construction') {
+      return {
+        'bg': const Color(0xFFFEF7E0), // Amber / Gold
+        'text': const Color(0xFFB06000),
+        'border': const Color(0xFFFDE293),
+      };
+    } else if (st == 'resale') {
+      return {
+        'bg': const Color(0xFFF3E8FF), // Purple / Lavender
+        'text': const Color(0xFF6B21A8),
+        'border': const Color(0xFFE9D5FF),
+      };
+    } else if (st == 'rent') {
+      return {
+        'bg': const Color(0xFFE8F0FE), // Soft Blue
+        'text': const Color(0xFF1A73E8),
+        'border': const Color(0xFFAECBFA),
+      };
+    } else if (st == 'rtm' || st == 'ready to move') {
+      return {
+        'bg': const Color(0xFFE0F2FE), // Teal / Sky Blue
+        'text': const Color(0xFF0369A1),
+        'border': const Color(0xFFBAE6FD),
+      };
+    } else if (st == 'na' || st == 'non-agricultural') {
+      return {
+        'bg': const Color(0xFFECFDF5), // Mint Green
+        'text': const Color(0xFF047857),
+        'border': const Color(0xFFA7F3D0),
+      };
+    } else if (st == 'non - na' || st == 'non na' || st == 'agricultural') {
+      return {
+        'bg': const Color(0xFFFFF1F2), // Rose Pink
+        'text': const Color(0xFFBE123C),
+        'border': const Color(0xFFFECDD3),
+      };
+    }
+
+    return {
+      'bg': const Color(0xFFF1F5F9), // Slate Grey
+      'text': const Color(0xFF334155),
+      'border': const Color(0xFFCBD5E1),
+    };
   }
 }
