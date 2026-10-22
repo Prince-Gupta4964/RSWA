@@ -447,63 +447,50 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
         children: [
           // 1. Main Media Item: Direct inline YouTube player if index 0 and has video, otherwise image stack
           _currentIndex == 0 && _hasVideo
-              ? Container(
-                  width: double.infinity,
-                  height: double.infinity,
-                  color: Colors.black,
-                  child: Center(
-                    child: Container(
-                      width: MediaQuery.of(context).size.width * 0.95,
-                      height: MediaQuery.of(context).size.height * 0.55,
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: kIsWeb && _videoId != null
-                                ? HtmlElementView(viewType: 'youtube-iframe-status-$_videoId')
-                                : Center(
-                                    child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        final Uri uri = Uri.parse(widget.videoUrl!);
-                                        canLaunchUrl(uri).then((canLaunch) {
-                                          if (canLaunch) launchUrl(uri, mode: LaunchMode.externalApplication);
-                                        });
-                                      },
-                                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B22)),
-                                      icon: const Icon(Icons.play_arrow),
-                                      label: const Text('Play YouTube Video'),
-                                    ),
-                                  ),
-                          ),
-                          Positioned(
-                            left: 0,
-                            top: 0,
-                            bottom: 0,
-                            width: 60,
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: _prevImage,
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: double.infinity,
+                      color: Colors.black,
+                      child: kIsWeb && _videoId != null
+                          ? HtmlElementView(viewType: 'youtube-iframe-status-$_videoId')
+                          : Center(
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  final Uri uri = Uri.parse(widget.videoUrl!);
+                                  canLaunchUrl(uri).then((canLaunch) {
+                                    if (canLaunch) launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  });
+                                },
+                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B22)),
+                                icon: const Icon(Icons.play_arrow),
+                                label: const Text('Play YouTube Video'),
+                              ),
                             ),
-                          ),
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            bottom: 0,
-                            width: 60,
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: _nextImage,
-                            ),
-                          ),
-                        ],
+                    ),
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 60,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _prevImage,
                       ),
                     ),
-                  ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 60,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _nextImage,
+                      ),
+                    ),
+                  ],
                 )
               : Stack(
                   fit: StackFit.expand,
