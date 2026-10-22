@@ -43,6 +43,7 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
       if (isAdmin) {'id': 'all_cp', 'label': 'All CP'},
       if (isAdmin) {'id': 'customers', 'label': 'Customers'},
       {'id': 'fav_cp', 'label': 'Fav CP'},
+      {'id': 'imported_cp', 'label': 'Imported CP'},
       {'id': 'builders', 'label': 'Builders'},
       {'id': 'investors', 'label': 'Investors'},
       {'id': 'pending', 'label': 'Pending Approval'},
@@ -122,6 +123,9 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
           if (isCustomerRole) return false;
           final favUids = List<dynamic>.from(cp.rawData['favUids'] ?? []);
           return favUids.contains(authVM.userUid);
+
+        case 'imported_cp':
+          return cp.isImported;
 
         case 'builders':
           if (partnerType != 'builder') return false;
@@ -312,6 +316,7 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
         'isApproved': false,
         'isProfileComplete': false,
         'referralCode': '',
+        'isImported': true,
       };
 
       try {
@@ -986,9 +991,28 @@ class _CPTileState extends State<_CPTile> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            widget.cp.fullName,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
+                          Row(
+                            children: [
+                              Text(
+                                widget.cp.fullName,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
+                              ),
+                              if (widget.cp.isImported) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: Colors.purple.shade50,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.purple.shade200, width: 1.1),
+                                  ),
+                                  child: Text(
+                                    'Imported',
+                                    style: TextStyle(fontSize: 9, color: Colors.purple.shade700, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 2),
                           Text(

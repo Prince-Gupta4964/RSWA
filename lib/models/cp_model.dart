@@ -15,6 +15,7 @@ class CPModel {
   final bool isApproved;     // 🚀 NAYA
   final bool isProfileComplete; // 🚀 NAYA
   final bool isDeleted; // 🚀 NAYA
+  final bool isImported; // 🚀 NAYA
   final Map<String, dynamic> rawData;
 
   String get fullName {
@@ -48,6 +49,7 @@ class CPModel {
     required this.isApproved,
     required this.isProfileComplete,
     this.isDeleted = false, // 🚀 NAYA
+    this.isImported = false, // 🚀 NAYA
     required this.rawData,
   });
 
@@ -69,6 +71,7 @@ class CPModel {
       isApproved: data['isApproved'] == true || data['isApproved'] == 1,
       isProfileComplete: data['isProfileComplete'] == true || data['isProfileComplete'] == 1,
       isDeleted: data['isDeleted'] == true,
+      isImported: data['isImported'] == true || data['isImported'] == 1,
       rawData: data,
     );
   }
