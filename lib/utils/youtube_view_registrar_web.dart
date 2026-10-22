@@ -13,6 +13,7 @@ void registerYouTubeViewFactory(String viewType, String videoId) {
         iframe.style.border = 'none';
         iframe.style.width = '100%';
         iframe.style.height = '100%';
+        iframe.style.pointerEvents = 'none';
         iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
         return iframe;
       },
