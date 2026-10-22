@@ -1428,37 +1428,34 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
       );
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: _categories.map((cat) {
           final val = cat['value'];
           final isSelected = _searchCategory == val || (_searchCategory == 'All' && val == 'All');
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                if (val == 'All') {
-                  _selectedMainCategory = null;
-                  _selectedSubCategory = null;
-                  _searchCategory = 'All';
-                } else {
-                  _selectedMainCategory = val;
-                  _selectedSubCategory = null;
-                  _searchCategory = val;
-                }
-              });
-            },
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 6),
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (val == 'All') {
+                    _selectedMainCategory = null;
+                    _selectedSubCategory = null;
+                    _searchCategory = 'All';
+                  } else {
+                    _selectedMainCategory = val;
+                    _selectedSubCategory = null;
+                    _searchCategory = val;
+                  }
+                });
+              },
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    height: 36,
-                    width: 36,
+                    height: 40,
+                    width: 40,
                     decoration: BoxDecoration(
                       color: isSelected ? _primaryDark : Colors.grey.shade100,
                       shape: BoxShape.circle,
@@ -1473,17 +1470,20 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                     child: Icon(
                       cat['icon'],
                       color: isSelected ? Colors.white : Colors.black87,
-                      size: 18,
+                      size: 20,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Text(
                     cat['label'],
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 11,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                       color: isSelected ? _primaryDark : Colors.black87,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
