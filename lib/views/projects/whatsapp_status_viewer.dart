@@ -458,25 +458,49 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
                       decoration: BoxDecoration(
                         color: Colors.black,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFFF6B22), width: 2),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: kIsWeb && _videoId != null
-                            ? HtmlElementView(viewType: 'youtube-iframe-status-$_videoId')
-                            : Center(
-                                child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    final Uri uri = Uri.parse(widget.videoUrl!);
-                                    canLaunchUrl(uri).then((canLaunch) {
-                                      if (canLaunch) launchUrl(uri, mode: LaunchMode.externalApplication);
-                                    });
-                                  },
-                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B22)),
-                                  icon: const Icon(Icons.play_arrow),
-                                  label: const Text('Play YouTube Video'),
-                                ),
-                              ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: kIsWeb && _videoId != null
+                                ? HtmlElementView(viewType: 'youtube-iframe-status-$_videoId')
+                                : Center(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        final Uri uri = Uri.parse(widget.videoUrl!);
+                                        canLaunchUrl(uri).then((canLaunch) {
+                                          if (canLaunch) launchUrl(uri, mode: LaunchMode.externalApplication);
+                                        });
+                                      },
+                                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B22)),
+                                      icon: const Icon(Icons.play_arrow),
+                                      label: const Text('Play YouTube Video'),
+                                    ),
+                                  ),
+                          ),
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: 60,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: _prevImage,
+                            ),
+                          ),
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: 60,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: _nextImage,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
