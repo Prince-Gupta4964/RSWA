@@ -39,7 +39,12 @@ class _AddLeadViewState extends State<AddLeadView> {
 
   List<Map<String, dynamic>> get _formStructure {
     final configVM = Provider.of<AppConfigurationViewModel>(context);
-    return configVM.getFormStructure('Lead Form', LeadFormStrings.formStructure);
+    final structure = configVM.getFormStructure('Lead Form', LeadFormStrings.formStructure);
+    final status = (_formData['status'] ?? '').toString().trim().toLowerCase();
+    if (status != 'paid' && status != 'book') {
+      return structure.where((s) => s['title'] != LeadFormStrings.sectionPaidDetails).toList();
+    }
+    return structure;
   }
 
   final Map<String, dynamic> _formData = {};
