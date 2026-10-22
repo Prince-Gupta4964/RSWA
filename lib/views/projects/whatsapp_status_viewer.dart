@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:share_plus/share_plus.dart';
@@ -379,7 +380,17 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
 
       if (currentUrl.isNotEmpty) {
         if (kIsWeb) {
-          await Share.share(caption + '\n\n🔗 Media: $currentUrl');
+          await Clipboard.setData(ClipboardData(text: '$caption\n\n🔗 Media URL: $currentUrl'));
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Property caption & media link copied to clipboard! Paste it in your WhatsApp Status.'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+          return;
         } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
