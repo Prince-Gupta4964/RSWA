@@ -19,6 +19,7 @@ import '../../models/project_model.dart';
 import '../../utils/role_permissions.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/app_drawer.dart';
+import '../../widgets/verified_p_badge.dart';
 import 'whatsapp_status_viewer.dart';
 
 class ProjectListView extends StatefulWidget {
@@ -1675,6 +1676,12 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                             ),
                           ),
                         ),
+                        if (project.isLegallyVerified)
+                          const Positioned(
+                            bottom: 6,
+                            right: 6,
+                            child: VerifiedPBadge(compact: true),
+                          ),
                       ],
                     ),
                   ),
@@ -1691,6 +1698,10 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                         // Line 1: Project Name + Green Tag + Fav Heart
                         Row(
                           children: [
+                            if (project.isLegallyVerified) ...[
+                              const VerifiedPBadge(compact: true),
+                              const SizedBox(width: 6),
+                            ],
                             Expanded(
                               child: Text(
                                 project.projectName,

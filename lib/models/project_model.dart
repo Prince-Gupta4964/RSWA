@@ -26,6 +26,11 @@ class ProjectModel {
     return loc.isNotEmpty && loc != 'null' ? loc : 'Location N/A';
   }
 
+  bool get isLegallyVerified {
+    final l = (legality ?? rawData['legality'] ?? propertyDetails['legality'] ?? '').toString().toLowerCase();
+    return l.contains('verified') || l.contains('legally') || l.contains('rera approved') || l == 'yes' || l == 'true';
+  }
+
   int get priorityNumber {
     final val = isHot;
     if (val is int) return val;

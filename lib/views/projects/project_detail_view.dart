@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart'; // 🚀 NAYA
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/project_model.dart';
+import '../../widgets/verified_p_badge.dart';
 import '../../models/builder_model.dart';
 import '../../models/cp_model.dart';
 import '../../viewmodels/auth_viewmodel.dart';
@@ -185,6 +186,12 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
                             ),
                           ),
                           Positioned(bottom: 15, left: 0, right: 0, child: _headerQuickActions(details, coverImage)),
+                          if (widget.project.isLegallyVerified)
+                            const Positioned(
+                              bottom: 70,
+                              right: 16,
+                              child: VerifiedPBadge(),
+                            ),
                         ],
                       ),
                     ),
@@ -1727,6 +1734,10 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    if (p.isLegallyVerified) ...[
+                      const VerifiedPBadge(compact: false),
+                      const SizedBox(width: 8),
+                    ],
                     Expanded(
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
