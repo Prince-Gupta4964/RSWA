@@ -455,7 +455,10 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
                       height: double.infinity,
                       color: Colors.black,
                       child: kIsWeb && _videoId != null
-                          ? HtmlElementView(viewType: 'youtube-iframe-status-$_videoId')
+                          ? AbsorbPointer(
+                              absorbing: true,
+                              child: HtmlElementView(viewType: 'youtube-iframe-status-$_videoId'),
+                            )
                           : Center(
                               child: ElevatedButton.icon(
                                 onPressed: () {
