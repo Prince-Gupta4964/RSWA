@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../../../services/home_screen_shortcut.dart';
+import '../../../../services/storage_helper.dart';
+import '../../../../viewmodels/auth_viewmodel.dart';
 import '../../models/task.dart';
 import '../../services/task_share_print_service.dart';
 import '../../viewmodels/map_screen_viewmodel.dart';
@@ -88,12 +91,30 @@ class MapScreenToolbarMenu {
           title: 'Print list',
           value: 'print',
         ),
+        _menuItem(
+          icon: Icons.refresh_rounded,
+          title: 'Refresh',
+          value: 'refresh',
+        ),
       ],
     );
 
     if (!context.mounted || action == null) return;
 
     switch (action) {
+      case 'refresh':
+        if (kIsWeb) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Refreshing and updating app...'), backgroundColor: Color(0xFFFF6B22)),
+          );
+          await Future.delayed(const Duration(milliseconds: 600));
+          StorageHelper.reloadApp();
+        } else {
+          final authVm = Provider.of<AuthViewModel>(context, listen: false);
+          viewModel.listenForTasks(authVm);
+          onShowMessage('Tasks refreshed!');
+        }
+        break;
       case 'sort':
         await chooseTaskOptionDialog(
           context: context,

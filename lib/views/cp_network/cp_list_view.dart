@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,6 +13,7 @@ import '../../viewmodels/lead_viewmodel.dart';
 import '../../viewmodels/app_configuration_viewmodel.dart';
 import '../../utils/role_permissions.dart';
 import '../../services/contact_picker_service.dart';
+import '../../services/storage_helper.dart';
 import 'contact_picker_sheet.dart';
 import '../../widgets/app_drawer.dart';
 
@@ -579,7 +581,7 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
                 ),
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert, color: Colors.black87),
-                  onSelected: (value) {
+                  onSelected: (value) async {
                     if (value == 'import_contacts') {
                       _importContacts(cpVM, authVM);
                     } else if (value == 'filter') {
@@ -592,6 +594,21 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
                           _selectedCPIds.add(filteredCPs.first.id);
                         }
                       });
+                    } else if (value == 'refresh') {
+                      if (kIsWeb) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Refreshing and updating app...'), backgroundColor: Color(0xFFFF6B22)),
+                        );
+                        await Future.delayed(const Duration(milliseconds: 600));
+                        StorageHelper.reloadApp();
+                      } else {
+                        cpVM.fetchCPs();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Partners refreshed!'), backgroundColor: Colors.green, duration: Duration(seconds: 1)),
+                          );
+                        }
+                      }
                     }
                   },
                   itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -632,6 +649,16 @@ class _CPListViewState extends State<CPListView> with TickerProviderStateMixin {
                           Icon(Icons.account_circle_outlined, color: Colors.black54),
                           SizedBox(width: 12),
                           Text('Profile / Score'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'refresh',
+                      child: Row(
+                        children: [
+                          Icon(Icons.refresh_rounded, color: Colors.black54),
+                          SizedBox(width: 12),
+                          Text('Refresh'),
                         ],
                       ),
                     ),
