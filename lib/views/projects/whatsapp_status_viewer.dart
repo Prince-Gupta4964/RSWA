@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../utils/youtube_view_registrar.dart';
 import '../../viewmodels/auth_viewmodel.dart';
@@ -364,9 +367,49 @@ class _SingleStatusPageState extends State<_SingleStatusPage> with TickerProvide
     });
   }
 
-  void _shareProject() {
-    final String shareText = 'Check out this amazing property: ${widget.projectName} at ${widget.location}!';
-    Share.share(shareText);
+  Future<void> _shareProject() async {
+    try {
+      final currentUrl = (_currentIndex == 0 && _hasVideo && widget.videoUrl != null && widget.videoUrl!.isNotEmpty)
+          ? widget.videoUrl!
+          : (widget.imageUrls.isNotEmpty ? widget.imageUrls[_currentIndex] : '');
+
+      final caption = '🏢 *${widget.projectName}*\n'
+          '📍 Location: ${widget.location}\n\n'
+          '✨ Explore verified luxury property details, photos & video walkthroughs on *Property+*!';
+
+      if (currentUrl.isNotEmpty) {
+        if (kIsWeb) {
+          await Share.share(caption + '\n\n🔗 Media: $currentUrl');
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Preparing media to share...'), duration: Duration(seconds: 1)),
+            );
+          }
+          final response = await http.get(Uri.parse(currentUrl));
+          if (response.statusCode == 200) {
+            final tempDir = await getTemporaryDirectory();
+            final isVideo = currentUrl.toLowerCase().contains('.mp4') || currentUrl.toLowerCase().contains('video') || (_currentIndex == 0 && _hasVideo);
+            final ext = isVideo ? 'mp4' : 'jpg';
+            final file = File('${tempDir.path}/property_media_${DateTime.now().millisecondsSinceEpoch}.$ext');
+            await file.writeAsBytes(response.bodyBytes);
+
+            await Share.shareXFiles(
+              [XFile(file.path)],
+              text: caption,
+            );
+            return;
+          }
+        }
+      }
+      await Share.share(caption);
+    } catch (e) {
+      debugPrint('Error sharing media: $e');
+      final caption = '🏢 *${widget.projectName}*\n'
+          '📍 Location: ${widget.location}\n\n'
+          '✨ Explore verified luxury property details on *Property+*!';
+      await Share.share(caption);
+    }
   }
 
   @override
