@@ -1734,10 +1734,6 @@ class _ProjectDetailViewState extends State<ProjectDetailView> with TickerProvid
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    if (p.isLegallyVerified) ...[
-                      const VerifiedPBadge(compact: false),
-                      const SizedBox(width: 8),
-                    ],
                     Expanded(
                       child: FittedBox(
                         fit: BoxFit.scaleDown,

@@ -1698,10 +1698,6 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                         // Line 1: Project Name + Green Tag + Fav Heart
                         Row(
                           children: [
-                            if (project.isLegallyVerified) ...[
-                              const VerifiedPBadge(compact: true),
-                              const SizedBox(width: 6),
-                            ],
                             Expanded(
                               child: Text(
                                 project.projectName,
