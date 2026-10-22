@@ -6,9 +6,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart'
     show debugPrint, defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../firebase_options.dart';
+import '../routes/app_router.dart';
 
 const AndroidNotificationChannel _notificationChannel =
     AndroidNotificationChannel(
@@ -152,27 +154,63 @@ class NotificationService {
   }
 
   Future<void> _showLocalAlert(String title, String body, String docId) async {
-    if (!_isMobile) {
-      debugPrint('NOTIFICATION [Web]: $title - $body');
-      return;
+    if (_isMobile) {
+      await _localNotifications.show(
+        docId.hashCode,
+        title,
+        body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'task_notifications',
+            'Task notifications',
+            channelDescription: 'Notifications about assigned tasks and reminders',
+            importance: Importance.max,
+            priority: Priority.high,
+            ticker: 'ticker',
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+      );
     }
 
-    await _localNotifications.show(
-      docId.hashCode,
-      title,
-      body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'task_notifications',
-          'Task notifications',
-          channelDescription: 'Notifications about assigned tasks and reminders',
-          importance: Importance.max,
-          priority: Priority.high,
-          ticker: 'ticker',
-        ),
-        iOS: DarwinNotificationDetails(),
-      ),
-    );
+    try {
+      final context = AppRouter.rootNavigatorKey.currentContext;
+      if (context != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.notifications_active, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                      Text(body, style: const TextStyle(fontSize: 12, color: Colors.white70), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFFFF6B22),
+            duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            action: SnackBarAction(
+              label: 'View',
+              textColor: Colors.white,
+              onPressed: () {
+                AppRouter.router.push('/map');
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error showing in-app notification banner: $e');
+    }
   }
 
   Future<void> _saveToken(String uid, String token) async {
