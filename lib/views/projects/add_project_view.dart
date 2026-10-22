@@ -427,7 +427,7 @@ class _AddProjectViewState extends State<AddProjectView> {
       } else if (f['id'] == fieldId) {
         if (fieldId == 'subType') {
           final pType = _formData['propertyType']?.toString() ?? '';
-          if (pType == 'Project') return ['Residential', 'Commercial', 'Bungalow', 'Redevelopment', 'Bulk'];
+          if (pType == 'Project') return ['Residential', 'Commercial', 'Bungalow', 'Redevelopment', 'Bulk', 'Builder', 'Investor'];
           if (pType == 'Flat' || pType == 'Shop' || pType == 'Bungalow') return ['New', 'Resale'];
           if (pType == 'Land') return ['NA', 'Non-NA'];
         }
@@ -894,7 +894,9 @@ class _AddProjectViewState extends State<AddProjectView> {
       if (pType.isEmpty) return const SizedBox.shrink();
 
       List<String> dynamicOptions = [];
-      if (pType == 'Land') {
+      if (pType == 'Project') {
+        dynamicOptions = ['Residential', 'Commercial', 'Bungalow', 'Redevelopment', 'Bulk', 'Builder', 'Investor'];
+      } else if (pType == 'Land') {
         dynamicOptions = ['NA', 'Non - NA'];
       } else {
         dynamicOptions = ['New', 'UC', 'Resale', 'Rent', 'RTM'];

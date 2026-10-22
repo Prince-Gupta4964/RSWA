@@ -49,7 +49,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
   String? _selectedMainCategory;
   String? _selectedSubCategory;
   final Map<String, List<String>> _subTypesMap = {
-    'Project': ['Residential', 'Shop', 'Bungalow', 'Redevelopment', 'Bulk'],
+    'Project': ['Residential', 'Commercial', 'Bungalow', 'Redevelopment', 'Bulk', 'Builder', 'Investor'],
     'Flat': ['1BHK', '2BHK', '3BHK', '4BHK', '5BHK'],
     'Shop': ['1 STOREY', '2 STOREY'],
     'Bungalow': ['1BHK', '2BHK', '3BHK', '4BHK', '5BHK'],
