@@ -32,6 +32,7 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   StreamSubscription<RemoteMessage>? _messageSubscription;
   StreamSubscription<String>? _tokenSubscription;
+  StreamSubscription<QuerySnapshot>? _firestoreNotificationSub;
 
   bool get _isMobile =>
       !kIsWeb &&
@@ -82,6 +83,7 @@ class NotificationService {
   }
 
   Future<void> registerDevice(String uid) async {
+    await listenToUserNotifications(uid);
     if (!_isMobile) return;
 
     final permission = await FirebaseMessaging.instance.requestPermission(
@@ -100,6 +102,77 @@ class NotificationService {
       return;
     }
     await _saveToken(uid, token);
+  }
+
+  Future<void> listenToUserNotifications(String uid) async {
+    try {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      String userName = '';
+      String userEmail = '';
+      if (userDoc.exists) {
+        final data = userDoc.data();
+        userName = (data?['name'] ?? data?['fullName'] ?? '').toString().trim();
+        userEmail = (data?['email'] ?? '').toString().trim();
+      } else {
+        final legacy = await FirebaseFirestore.instance.collection('users').where('uid', isEqualTo: uid).limit(1).get();
+        if (legacy.docs.isNotEmpty) {
+          final data = legacy.docs.first.data();
+          userName = (data['name'] ?? data['fullName'] ?? '').toString().trim();
+          userEmail = (data['email'] ?? '').toString().trim();
+        }
+      }
+
+      if (userName.isEmpty && userEmail.isEmpty) return;
+
+      _firestoreNotificationSub?.cancel();
+      _firestoreNotificationSub = FirebaseFirestore.instance
+          .collection('notifications')
+          .where('isRead', isEqualTo: false)
+          .snapshots()
+          .listen((snapshot) {
+        for (final change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.added) {
+            final data = change.doc.data();
+            if (data == null) continue;
+            final recipient = (data['recipientName'] ?? '').toString().trim().toLowerCase();
+            final title = data['title']?.toString() ?? 'New Notification';
+            final body = data['body']?.toString() ?? '';
+
+            if ((userName.isNotEmpty && recipient == userName.toLowerCase()) ||
+                (userEmail.isNotEmpty && recipient == userEmail.toLowerCase()) ||
+                recipient == uid.toLowerCase()) {
+              _showLocalAlert(title, body, change.doc.id);
+            }
+          }
+        }
+      });
+    } catch (e) {
+      debugPrint('Error listening to notifications: $e');
+    }
+  }
+
+  Future<void> _showLocalAlert(String title, String body, String docId) async {
+    if (!_isMobile) {
+      debugPrint('NOTIFICATION [Web]: $title - $body');
+      return;
+    }
+
+    await _localNotifications.show(
+      docId.hashCode,
+      title,
+      body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'task_notifications',
+          'Task notifications',
+          channelDescription: 'Notifications about assigned tasks and reminders',
+          importance: Importance.max,
+          priority: Priority.high,
+          ticker: 'ticker',
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+    );
   }
 
   Future<void> _saveToken(String uid, String token) async {
@@ -154,5 +227,6 @@ class NotificationService {
   Future<void> dispose() async {
     await _messageSubscription?.cancel();
     await _tokenSubscription?.cancel();
+    await _firestoreNotificationSub?.cancel();
   }
 }
