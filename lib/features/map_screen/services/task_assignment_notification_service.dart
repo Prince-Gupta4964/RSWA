@@ -24,22 +24,44 @@ class TaskAssignmentNotificationService {
     }
 
     String? targetFcmToken;
-    final userQuery = await _firestore
-        .collection('users')
-        .where('name', isEqualTo: recipient)
-        .limit(1)
-        .get();
-    if (userQuery.docs.isNotEmpty) {
-      targetFcmToken = userQuery.docs.first.data()['fcmToken']?.toString();
-    } else {
-      final cpQuery = await _firestore
-          .collection('cps')
-          .where('cpName', isEqualTo: recipient)
-          .limit(1)
-          .get();
-      if (cpQuery.docs.isNotEmpty) {
-        targetFcmToken = cpQuery.docs.first.data()['fcmToken']?.toString();
+    try {
+      final usersSnapshot = await _firestore.collection('users').get();
+      for (final doc in usersSnapshot.docs) {
+        final data = doc.data();
+        final name = (data['name'] ?? '').toString().trim();
+        final fullName = (data['fullName'] ?? '').toString().trim();
+        final email = (data['email'] ?? '').toString().trim();
+        final token = (data['fcmToken'] ?? '').toString();
+
+        if (token.isNotEmpty &&
+            (name.toLowerCase() == recipient.toLowerCase() ||
+             fullName.toLowerCase() == recipient.toLowerCase() ||
+             email.toLowerCase() == recipient.toLowerCase() ||
+             doc.id.toLowerCase() == recipient.toLowerCase())) {
+          targetFcmToken = token;
+          break;
+        }
       }
+
+      if (targetFcmToken == null) {
+        final cpsSnapshot = await _firestore.collection('cps').get();
+        for (final doc in cpsSnapshot.docs) {
+          final data = doc.data();
+          final cpName = (data['cpName'] ?? data['name'] ?? data['fullName'] ?? '').toString().trim();
+          final email = (data['email'] ?? '').toString().trim();
+          final token = (data['fcmToken'] ?? '').toString();
+
+          if (token.isNotEmpty &&
+              (cpName.toLowerCase() == recipient.toLowerCase() ||
+               email.toLowerCase() == recipient.toLowerCase() ||
+               doc.id.toLowerCase() == recipient.toLowerCase())) {
+            targetFcmToken = token;
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
     }
 
     await _firestore.collection('notifications').add({
