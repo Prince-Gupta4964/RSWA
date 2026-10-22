@@ -115,6 +115,21 @@ class _CPDetailViewState extends State<CPDetailView> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // Digital Visiting Card Button
+                ElevatedButton.icon(
+                  onPressed: () => context.push('/digital-visiting-card', extra: widget.cp),
+                  icon: const Icon(Icons.badge_rounded, color: Colors.white),
+                  label: const Text('View Digital Visiting Card', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF6B22),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    elevation: 1,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
                 // 1. BASIC INFO
                 _buildCollapsible('Basic Info', Icons.badge_outlined, [
                   _detailRow('Partner ID', data['cpID']),

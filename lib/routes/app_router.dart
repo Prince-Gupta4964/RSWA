@@ -28,6 +28,7 @@ import '../views/leads/advisor_leads_view.dart'; // 🚀 NAYA
 import '../views/cp_network/add_cp_view.dart';
 import '../views/cp_network/cp_list_view.dart';
 import '../views/cp_network/cp_detail_view.dart';
+import '../views/cp_network/digital_visiting_card_view.dart';
 import '../views/projects/add_project_view.dart';
 import '../views/projects/project_list_view.dart';
 import '../views/projects/project_detail_view.dart';
@@ -365,6 +366,17 @@ class AppRouter {
              return const AuthGuard(child: Scaffold(body: Center(child: Text("Partner not found."))));
           }
           return AuthGuard(child: CPDetailView(cp: cp));
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/digital-visiting-card',
+        builder: (context, state) {
+          final cp = state.extra as CPModel?;
+          if (cp == null) {
+            return const AuthGuard(child: Scaffold(body: Center(child: Text('CP Profile not found'))));
+          }
+          return AuthGuard(child: DigitalVisitingCardView(cp: cp));
         },
       ),
       GoRoute(
