@@ -606,8 +606,12 @@ class _AddLeadViewState extends State<AddLeadView> {
 
   Future<void> _pickNumberFromContacts(String fieldId) async {
     try {
+      final cpVM = Provider.of<CPViewModel>(context, listen: false);
+      final authVM = Provider.of<AuthViewModel>(context, listen: false);
       final results = await ContactPickerService.pickContacts(
         context: context,
+        cpVM: cpVM,
+        authVM: authVM,
         multiple: false,
       );
 

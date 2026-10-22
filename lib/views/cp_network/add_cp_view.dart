@@ -516,7 +516,14 @@ class _AddCPViewState extends State<AddCPView> {
 
   Future<void> _pickNumberFromContactsLocal(String fieldId) async {
     try {
-      final results = await ContactPickerService.pickContacts(context: context, multiple: false);
+      final cpVM = Provider.of<CPViewModel>(context, listen: false);
+      final authVM = Provider.of<AuthViewModel>(context, listen: false);
+      final results = await ContactPickerService.pickContacts(
+        context: context,
+        cpVM: cpVM,
+        authVM: authVM,
+        multiple: false,
+      );
       if (results.isNotEmpty && mounted) {
         final selectedNumber = results.first['tel'];
         if (selectedNumber != null) setState(() { final clean = selectedNumber.replaceAll(RegExp(r'\s+'), ''); _controllers[fieldId]?.text = clean; _formData[fieldId] = clean; });
