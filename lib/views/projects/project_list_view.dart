@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/project_viewmodel.dart';
+import '../../services/storage_helper.dart';
 import '../../viewmodels/app_configuration_viewmodel.dart';
 import '../../models/project_model.dart';
 import '../../utils/role_permissions.dart';
@@ -957,7 +958,7 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                 ),
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert, color: Colors.black87),
-                  onSelected: (value) {
+                  onSelected: (value) async {
                     if (value == 'filter') {
                       _showSearchPopup();
                     } else if (value == 'profile') {
@@ -970,10 +971,20 @@ class _ProjectListViewState extends State<ProjectListView> with TickerProviderSt
                         }
                       });
                     } else if (value == 'refresh') {
-                      projectVM.fetchProjects();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Projects refreshed!'), backgroundColor: Colors.green, duration: Duration(seconds: 1)),
-                      );
+                      if (kIsWeb) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Refreshing and updating app...'), backgroundColor: Color(0xFFFF6B22)),
+                        );
+                        await Future.delayed(const Duration(milliseconds: 600));
+                        StorageHelper.reloadApp();
+                      } else {
+                        projectVM.fetchProjects();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Projects refreshed!'), backgroundColor: Colors.green, duration: Duration(seconds: 1)),
+                          );
+                        }
+                      }
                     }
                   },
                   itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
