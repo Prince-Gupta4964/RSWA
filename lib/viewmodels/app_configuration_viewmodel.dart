@@ -253,6 +253,9 @@ class AppConfigurationViewModel extends ChangeNotifier {
   }
 
   List<String> getOptionsForField(String formName, String fieldId, List<String> defaultOptions) {
+    if (fieldId == 'subType') {
+      return defaultOptions;
+    }
     if (_fieldOptions.containsKey(formName) && _fieldOptions[formName]!.containsKey(fieldId)) {
       final custom = _fieldOptions[formName]![fieldId]!;
       if (custom.isNotEmpty) return custom;
