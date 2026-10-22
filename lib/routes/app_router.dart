@@ -430,6 +430,13 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/share/cp/:cpName',
+        builder: (context, state) {
+          final cpName = state.pathParameters['cpName'] ?? '';
+          return PublicCpLoader(cpName: cpName);
+        },
+      ),
+      GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: '/recycle-bin',
         builder: (context, state) => const AuthGuard(child: RecycleBinView()),
@@ -555,6 +562,60 @@ class PublicProjectLoader extends StatelessWidget {
         );
 
         return ProjectDetailView(project: project, isPublicView: true);
+      },
+    );
+  }
+}
+
+class PublicCpLoader extends StatelessWidget {
+  final String cpName;
+  const PublicCpLoader({super.key, required this.cpName});
+
+  Future<DocumentSnapshot<Map<String, dynamic>>?> _findCpDoc(String decodedName) async {
+    final query = await FirebaseFirestore.instance
+        .collection('cps')
+        .where('cpName', isEqualTo: decodedName)
+        .limit(1)
+        .get();
+    if (query.docs.isNotEmpty) return query.docs.first;
+
+    final queryFullName = await FirebaseFirestore.instance
+        .collection('cps')
+        .where('fullName', isEqualTo: decodedName)
+        .limit(1)
+        .get();
+    if (queryFullName.docs.isNotEmpty) return queryFullName.docs.first;
+
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final decodedName = Uri.decodeComponent(cpName);
+
+    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>?>(
+      future: _findCpDoc(decodedName),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator(color: Color(0xFFFF6B22))),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null || !snapshot.data!.exists) {
+          return const Scaffold(
+            body: Center(
+              child: Text(
+                "Digital Visiting Card link expired or invalid.",
+                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+              ),
+            ),
+          );
+        }
+
+        final doc = snapshot.data!;
+        final cp = CPModel.fromMap(doc.data()!, doc.id);
+        return DigitalVisitingCardView(cp: cp);
       },
     );
   }
